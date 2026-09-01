@@ -15,11 +15,24 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 let names = [];
 let sceneState = { state: 'collecting', payload: null };
 
+// BEFORE:
 if (fs.existsSync(DATA_FILE)) {
   try {
     const saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     names = saved.names || [];
-    sceneState = saved.sceneState || sceneState;
+    sceneState = saved.sceneState || sceneState; // <-- This was restoring 'title' state on restart
+  } catch (err) {
+    console.error('Could not read saved state, starting fresh:', err.message);
+  }
+}
+
+// AFTER (FIX):
+if (fs.existsSync(DATA_FILE)) {
+  try {
+    const saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    names = saved.names || [];
+    // Force new server starts/restarts back to collecting state:
+    sceneState = { state: 'collecting', payload: null }; 
   } catch (err) {
     console.error('Could not read saved state, starting fresh:', err.message);
   }
