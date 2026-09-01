@@ -58,7 +58,10 @@ const TITLE_IN_MS = 1200;
 
 // Preload Official TAM Logo
 const tamLogo = new Image();
-tamLogo.src = '/tam-logo.png';
+tamLogo.onload = () => {
+  if (titleAnim) ensureLoop();
+};
+tamLogo.src = './tam-logo.png';
 
 const baseCanvas = document.getElementById('base');
 const fxCanvas = document.getElementById('fx');
