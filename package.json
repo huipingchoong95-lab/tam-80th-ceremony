@@ -1,0 +1,14 @@
+{
+  "name": "tam-80th-ceremony",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Live word-cloud opening ceremony display for TAM Penang's 80th anniversary event.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.3"
+  }
+}
