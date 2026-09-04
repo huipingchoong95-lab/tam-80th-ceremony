@@ -18,7 +18,7 @@
   }
   #counter { color: #f2c14e; font-size: 32px; font-weight: 800; }
 
-  /* Extra Large QR Badge HUD for Stage Projection */
+  /* Extra Large QR Badge HUD */
   #qr-hud {
     position: absolute; top: 32px; right: 36px; z-index: 10;
     background: rgba(19, 31, 46, 0.90); backdrop-filter: blur(12px);
@@ -58,7 +58,8 @@ const TITLE_IN_MS = 1200;
 
 // Preload Official TAM Logo
 const tamLogo = new Image();
-tamLogo.src = '/tam-logo.png';
+tamLogo.onload = () => { if (titleAnim) ensureLoop(); };
+tamLogo.src = './tam-logo.png';
 
 const baseCanvas = document.getElementById('base');
 const fxCanvas = document.getElementById('fx');
@@ -76,6 +77,7 @@ let banner = null;
 let dimAlpha = 0;
 let zoomAnim = null;
 let titleAnim = null;
+let featuredWordObj = null; // Stores featured (President's) name
 
 // Fireworks System
 let fireworks = [];
@@ -196,6 +198,7 @@ function rebuildSlotsAndRedraw() {
   slotIndex = 0;
   const entries = Array.from(placed.values());
   placed.clear();
+  featuredWordObj = null;
   baseCtx.clearRect(0, 0, W, H);
   drawIdleOutline();
   for (const w of entries) assignAndDraw(w.id, w.name, w.featured, true);
@@ -239,15 +242,42 @@ function nextSlot() {
 
 function assignAndDraw(id, name, featured, immediate) {
   if (placed.has(id)) return;
+
+  if (featured) {
+    // Lock President's name directly in the center in large font
+    const centerFontPx = Math.min(H * 0.08, W * 0.045);
+    const wordObj = {
+      id, name,
+      x: W / 2,
+      y: H / 2,
+      rot: 0,
+      color: FEATURED_COLOR,
+      fontPx: centerFontPx,
+      featured: true
+    };
+    placed.set(id, wordObj);
+    featuredWordObj = wordObj;
+    counterEl.textContent = placed.size;
+
+    if (immediate) {
+      stampWord(baseCtx, wordObj, 1);
+    } else {
+      animatingWords.push({ ...wordObj, start: performance.now() });
+      ensureLoop();
+    }
+    return;
+  }
+
+  // Standard regular participant slots
   const slot = nextSlot();
   const rot = (Math.random() * 16 - 8) * (Math.PI / 180);
-  const color = pickColor(name, featured);
+  const color = pickColor(name, false);
   const targetFontPx = fitFont(
     fxCtx, name,
-    slot.cellSize * (featured ? 1.9 : 0.92),
-    slot.cellSize * (featured ? 0.85 : 0.55)
+    slot.cellSize * 0.92,
+    slot.cellSize * 0.55
   );
-  const wordObj = { id, name, x: slot.x, y: slot.y, rot, color, fontPx: targetFontPx, featured: !!featured };
+  const wordObj = { id, name, x: slot.x, y: slot.y, rot, color, fontPx: targetFontPx, featured: false };
   placed.set(id, wordObj);
   counterEl.textContent = placed.size;
 
@@ -264,10 +294,17 @@ function stampWord(ctx, w, scale) {
   ctx.translate(w.x, w.y);
   ctx.rotate(w.rot);
   ctx.scale(scale, scale);
-  ctx.font = `600 ${w.fontPx}px Arial, sans-serif`;
+  ctx.font = w.featured ? `700 ${w.fontPx}px Arial, sans-serif` : `600 ${w.fontPx}px Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = w.color;
+  
+  // Highlight glow for President's name
+  if (w.featured) {
+    ctx.shadowColor = 'rgba(242, 193, 78, 0.6)';
+    ctx.shadowBlur = 15;
+  }
+  
   ctx.fillText(w.name, 0, 0);
   ctx.restore();
 }
@@ -398,42 +435,36 @@ function drawTitle(t) {
   
   // Render TAM Logo Above Title
   if (tamLogo.complete && tamLogo.naturalWidth > 0) {
-    const logoTargetWidth = Math.min(W * 0.35, 340);
-    const logoScale = logoTargetWidth / tamLogo.naturalWidth;
-    const logoW = logoTargetWidth * t;
-    const logoH = (tamLogo.naturalHeight * logoScale) * t;
+    const maxLogoW = Math.min(W * 0.4, 380);
+    const aspect = tamLogo.naturalHeight / tamLogo.naturalWidth;
     
-    // Draw white background container behind logo for contrast
-    fxCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    const padX = 20 * t, padY = 10 * t;
-    fxCtx.beginPath();
-    fxCtx.roundRect(
-      W / 2 - logoW / 2 - padX,
-      H * 0.28 - logoH / 2 - padY,
-      logoW + (padX * 2),
-      logoH + (padY * 2),
-      12
-    );
-    fxCtx.fill();
+    const logoW = maxLogoW * t;
+    const logoH = (maxLogoW * aspect) * t;
+    const logoY = H * 0.28;
 
-    fxCtx.drawImage(
-      tamLogo,
-      W / 2 - logoW / 2,
-      H * 0.28 - logoH / 2,
-      logoW,
-      logoH
-    );
+    const padX = 16 * t;
+    const padY = 8 * t;
+    fxCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    if (fxCtx.roundRect) {
+      fxCtx.beginPath();
+      fxCtx.roundRect(W / 2 - logoW / 2 - padX, logoY - logoH / 2 - padY, logoW + padX * 2, logoH + padY * 2, 10);
+      fxCtx.fill();
+    } else {
+      fxCtx.fillRect(W / 2 - logoW / 2 - padX, logoY - logoH / 2 - padY, logoW + padX * 2, logoH + padY * 2);
+    }
+
+    fxCtx.drawImage(tamLogo, W / 2 - logoW / 2, logoY - logoH / 2, logoW, logoH);
   }
 
   // Render Title Text
   const size1 = (Math.min(H * 0.08, W * 0.055)) * (0.2 + 0.8 * t);
   fxCtx.fillStyle = '#ffffff';
   fxCtx.font = `600 ${size1}px Arial, sans-serif`;
-  fxCtx.fillText(TITLE_LINE1, W / 2, H * 0.50);
+  fxCtx.fillText(TITLE_LINE1, W / 2, H * 0.52);
   
   fxCtx.fillStyle = FEATURED_COLOR;
   fxCtx.font = `700 ${size1 * 1.3}px Arial, sans-serif`;
-  fxCtx.fillText(TITLE_LINE2, W / 2, H * 0.63);
+  fxCtx.fillText(TITLE_LINE2, W / 2, H * 0.65);
   
   fxCtx.restore();
 }
@@ -444,6 +475,7 @@ source.addEventListener('sync', (e) => {
   const data = JSON.parse(e.data);
   placed.clear();
   slotIndex = 0;
+  featuredWordObj = null;
   baseCtx.clearRect(0, 0, W, H);
   drawIdleOutline();
   for (const n of data.names) {
@@ -471,6 +503,7 @@ source.addEventListener('name:reset', () => {
   animatingWords = [];
   zoomAnim = null;
   titleAnim = null;
+  featuredWordObj = null;
   dimAlpha = 0;
   counterEl.textContent = '0';
   baseCtx.clearRect(0, 0, W, H);
