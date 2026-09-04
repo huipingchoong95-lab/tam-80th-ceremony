@@ -15,23 +15,11 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 let names = [];
 let sceneState = { state: 'collecting', payload: null };
 
-// BEFORE:
+// Load saved names, but always reset scene state to 'collecting' on startup
 if (fs.existsSync(DATA_FILE)) {
   try {
     const saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     names = saved.names || [];
-    sceneState = saved.sceneState || sceneState; // <-- This was restoring 'title' state on restart
-  } catch (err) {
-    console.error('Could not read saved state, starting fresh:', err.message);
-  }
-}
-
-// AFTER (FIX):
-if (fs.existsSync(DATA_FILE)) {
-  try {
-    const saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    names = saved.names || [];
-    // Force new server starts/restarts back to collecting state:
     sceneState = { state: 'collecting', payload: null }; 
   } catch (err) {
     console.error('Could not read saved state, starting fresh:', err.message);
@@ -52,6 +40,11 @@ function broadcast(event, data) {
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Explicit route to guarantee display.html loads at root URL /
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'display.html'));
+});
 
 // QR Code API Endpoint
 app.get('/api/qr', async (req, res) => {
@@ -121,7 +114,6 @@ app.post('/api/admin/hide', (req, res) => {
 app.post('/api/admin/scene', (req, res) => {
   if (!checkPin(req, res)) return;
   const { state, payload } = req.body;
-  console.log('[admin/scene] state=%s payload=%o', state, payload);
 
   if (state === 'reset') {
     names = [];
@@ -132,24 +124,10 @@ app.post('/api/admin/scene', (req, res) => {
   }
 
   if (state === 'zoom' && payload && payload.name) {
-    const existing = names.find(
+    const already = names.find(
       (n) => n.name.toLowerCase() === payload.name.toLowerCase() && !n.hidden
     );
-    if (existing) {
-      // BUG FIX: this used to do nothing when the name already existed (e.g.
-      // an attendee happened to submit the same name before "zoom" was
-      // clicked). That left the entry with featured:false forever, which is
-      // exactly why it showed up in a random grid slot at a tiny size instead
-      // of centered — the display was never told it was the featured one.
-      // Now we upgrade the existing entry in place and tell every connected
-      // client about it.
-      if (!existing.featured) {
-        existing.featured = true;
-        persist();
-        console.log('[admin/scene:zoom] upgraded existing name to featured:', existing);
-        broadcast('name:updated', existing);
-      }
-    } else {
+    if (!already) {
       const entry = {
         id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
         name: payload.name,
@@ -159,7 +137,6 @@ app.post('/api/admin/scene', (req, res) => {
       };
       names.push(entry);
       persist();
-      console.log('[admin/scene:zoom] created new featured entry:', entry);
       broadcast('name:new', entry);
     }
   }
