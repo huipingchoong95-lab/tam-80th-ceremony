@@ -43,6 +43,10 @@
   </div>
 
 <script>
+const DEBUG = true; // set to false once everything's confirmed working, before the live event
+console.log('[display.html] script loaded @', new Date().toISOString(),
+  '— if this line does not appear after you save a change, the browser is showing a cached copy: hard-refresh with Ctrl/Cmd+Shift+R.');
+
 const PALETTE = ['#ffffff', '#dce8f7', '#9fc4ea'];
 const FEATURED_COLOR = '#f2c14e';
 const SHAPE_TEXT = '80';
@@ -235,6 +239,7 @@ function nextSlot() {
 
 function updateAllFontSizesExcept(excludeId) {
   const scaleMult = getDynamicScaleMultiplier(placed.size);
+  if (DEBUG) console.log('[updateAllFontSizesExcept]', { excludeId, totalPlaced: placed.size, scaleMult, canvasW: W, canvasH: H });
   baseCtx.clearRect(0, 0, W, H);
   drawIdleOutline();
   
@@ -254,12 +259,21 @@ function updateAllFontSizesExcept(excludeId) {
 function assignAndDraw(id, name, featured, immediate) {
   if (placed.has(id)) return;
 
-  // Bulletproof President / VIP detection
-  const isFeatured = (featured === true || featured === 'true' || featured === 1) ||
-                     (typeof name === 'string' && (
-                       name.toLowerCase().includes('president') ||
-                       name.toLowerCase().includes('vip')
-                     ));
+  // Only trust the server's `featured` flag. The old fallback that matched
+  // names containing "president" or "vip" was a false-positive trap: any
+  // attendee named e.g. "Vipul" or "Vipin" contains "vip" as a substring and
+  // would have been wrongly pulled to center stage. server.js is now the
+  // single source of truth for who is featured, including upgrading an
+  // already-submitted name in place if it matches the president's name
+  // (see the /api/admin/scene 'zoom' handler) — so this no longer needs
+  // a text-matching fallback.
+  const isFeatured = featured === true || featured === 'true' || featured === 1;
+
+  if (DEBUG) {
+    console.log('[assignAndDraw]', {
+      id, name, featuredRaw: featured, featuredType: typeof featured, isFeatured, immediate,
+    });
+  }
 
   if (isFeatured) {
     const centerFontPx = Math.max(52, Math.min(H * 0.11, W * 0.065));
@@ -289,12 +303,18 @@ function assignAndDraw(id, name, featured, immediate) {
   const scaleMult = getDynamicScaleMultiplier(totalCount);
   const rot = (Math.random() * 16 - 8) * (Math.PI / 180);
   const color = pickColor(name, false);
-  
-  const targetFontPx = fitFont(
-    fxCtx, name,
-    slot.cellSize * 4.0 * scaleMult, 
-    slot.cellSize * 1.5 * scaleMult  
-  );
+
+  const maxWidth = slot.cellSize * 4.0 * scaleMult;
+  const startPx = slot.cellSize * 1.5 * scaleMult;
+  const targetFontPx = fitFont(fxCtx, name, maxWidth, startPx);
+
+  if (DEBUG) {
+    console.log('[assignAndDraw:normal]', {
+      id, name, totalCount, cellSize: slot.cellSize, scaleMult,
+      startPx: Math.round(startPx), maxWidth: Math.round(maxWidth),
+      finalFontPx: targetFontPx, canvasW: W, canvasH: H,
+    });
+  }
 
   const wordObj = { id, name, x: slot.x, y: slot.y, rot, color, fontPx: targetFontPx, featured: false, cellSize: slot.cellSize };
   placed.set(id, wordObj);
@@ -448,15 +468,43 @@ const source = new EventSource('/api/events');
 
 source.addEventListener('sync', (e) => {
   const data = JSON.parse(e.data);
+  if (DEBUG) console.log('[sse:sync]', data.names.length, 'name(s)', data);
   placed.clear(); slotIndex = 0; featuredWordObj = null;
   baseCtx.clearRect(0, 0, W, H); drawIdleOutline();
   for (const n of data.names) if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, true);
-  counterEl.textContent = placed.size; applyScene(data.sceneState);
+  // BUG FIX: assignAndDraw sizes each name off placed.size *at the moment it
+  // runs*, which grows as this loop goes — so on a batch load, names earlier
+  // in the list got sized for a smaller crowd than names later in the same
+  // list, instead of everyone sharing the same final-count size. Re-run the
+  // sizing pass now that the real total is known.
+  updateAllFontSizesExcept(null);
+  counterEl.textContent = placed.size;
+  applyScene(data.sceneState);
 });
 
 source.addEventListener('name:new', (e) => {
   const n = JSON.parse(e.data);
+  if (DEBUG) console.log('[sse:name:new]', n);
   assignAndDraw(n.id, n.name, n.featured, false);
+});
+
+source.addEventListener('name:updated', (e) => {
+  const n = JSON.parse(e.data);
+  if (DEBUG) console.log('[sse:name:updated]', n);
+  const existing = placed.get(n.id);
+  if (!existing) return; // wasn't on screen yet, nothing to upgrade
+  existing.featured = true;
+  existing.x = W / 2;
+  existing.y = H / 2;
+  existing.rot = 0;
+  existing.color = FEATURED_COLOR;
+  existing.fontPx = Math.max(52, Math.min(H * 0.11, W * 0.065));
+  featuredWordObj = existing;
+  // Full redraw: the word's old spot in the shape needs to be cleared, not
+  // just drawn over, or you'll see a faint ghost of it left behind.
+  baseCtx.clearRect(0, 0, W, H);
+  drawIdleOutline();
+  for (const w of placed.values()) stampWord(baseCtx, w, 1);
 });
 
 source.addEventListener('name:hidden', (e) => {

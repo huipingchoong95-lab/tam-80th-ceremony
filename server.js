@@ -121,6 +121,7 @@ app.post('/api/admin/hide', (req, res) => {
 app.post('/api/admin/scene', (req, res) => {
   if (!checkPin(req, res)) return;
   const { state, payload } = req.body;
+  console.log('[admin/scene] state=%s payload=%o', state, payload);
 
   if (state === 'reset') {
     names = [];
@@ -131,10 +132,24 @@ app.post('/api/admin/scene', (req, res) => {
   }
 
   if (state === 'zoom' && payload && payload.name) {
-    const already = names.find(
+    const existing = names.find(
       (n) => n.name.toLowerCase() === payload.name.toLowerCase() && !n.hidden
     );
-    if (!already) {
+    if (existing) {
+      // BUG FIX: this used to do nothing when the name already existed (e.g.
+      // an attendee happened to submit the same name before "zoom" was
+      // clicked). That left the entry with featured:false forever, which is
+      // exactly why it showed up in a random grid slot at a tiny size instead
+      // of centered — the display was never told it was the featured one.
+      // Now we upgrade the existing entry in place and tell every connected
+      // client about it.
+      if (!existing.featured) {
+        existing.featured = true;
+        persist();
+        console.log('[admin/scene:zoom] upgraded existing name to featured:', existing);
+        broadcast('name:updated', existing);
+      }
+    } else {
       const entry = {
         id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
         name: payload.name,
@@ -144,6 +159,7 @@ app.post('/api/admin/scene', (req, res) => {
       };
       names.push(entry);
       persist();
+      console.log('[admin/scene:zoom] created new featured entry:', entry);
       broadcast('name:new', entry);
     }
   }
