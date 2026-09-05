@@ -52,7 +52,7 @@
     <span>Scan to Join Network</span>
   </div>
   
-  <div id="audio-hint">Click screen once to enable audio context</div>
+  <div id="audio-hint">Click or tap screen once to enable audio context</div>
 
 <script>
 const PALETTE = ['#ffffff', '#bae6fd', '#7dd3fc', '#00ffcc'];
@@ -70,10 +70,14 @@ const TITLE_IN_MS = 1200;
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioCtx = new AudioContext();
 
-document.addEventListener('click', () => {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  document.getElementById('audio-hint').style.display = 'none';
-}, { once: true });
+// Universal auto-unlock handler for browser audio policies
+['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => {
+  document.addEventListener(evt, () => {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const hint = document.getElementById('audio-hint');
+    if (hint) hint.style.display = 'none';
+  }, { once: true, passive: true });
+});
 
 function playBoom() {
   if (audioCtx.state === 'suspended') return;
@@ -202,7 +206,7 @@ function animateBg() {
 }
 requestAnimationFrame(animateBg);
 
-function buildSlots() {
+function buildSlots(totalCount = 50) {
   const off = document.createElement('canvas'); off.width = W; off.height = H;
   const octx = off.getContext('2d');
   const fontPx = Math.min(H * 0.75, W * 0.45);
@@ -211,8 +215,15 @@ function buildSlots() {
   octx.fillText(SHAPE_TEXT, W / 2, H / 2);
 
   const img = octx.getImageData(0, 0, W, H).data;
-  // Comfortable cell size for clean spacing
-  const cellSize = Math.max(36, Math.floor(W / 30));
+  
+  // Dynamically shrink cell spacing as total participant count grows to ensure high density
+  let cellSize = 36;
+  if (totalCount > 150) cellSize = 14;
+  else if (totalCount > 100) cellSize = 18;
+  else if (totalCount > 60) cellSize = 24;
+  else if (totalCount > 30) cellSize = 30;
+  
+  cellSize = Math.max(12, Math.floor(cellSize));
   const result = [];
   const reservedRadius = Math.min(W, H) * 0.18;
 
@@ -236,7 +247,9 @@ function getTargetFontSize(totalCount) {
   if (totalCount <= 15) return Math.min(W * 0.022, 28);
   if (totalCount <= 30) return Math.min(W * 0.016, 21);
   if (totalCount <= 60) return Math.min(W * 0.012, 16);
-  return Math.min(W * 0.0095, 12);
+  if (totalCount <= 100) return Math.min(W * 0.0095, 12);
+  if (totalCount <= 150) return Math.min(W * 0.0075, 10);
+  return Math.min(W * 0.006, 8); // Scaled down neatly for 150+ names so all remain visible and distinct
 }
 
 function checkIsPresident(name, featured) {
@@ -249,7 +262,7 @@ function checkIsPresident(name, featured) {
 }
 
 function rebuildSlotsAndRedraw() {
-  slots = buildSlots(); slotIndex = 0;
+  slots = buildSlots(placed.size + 1); slotIndex = 0;
   const entries = Array.from(placed.values());
   placed.clear();
   baseCtx.clearRect(0, 0, W, H);
@@ -298,9 +311,16 @@ function assignAndDraw(id, name, featured, immediate) {
     return;
   }
 
-  const slot = slots.length === 0 ? { x: W / 2, y: H / 2 } : slots[slotIndex % slots.length];
+  // Automatically rebuild/expand slot grid density if we run out of slots or capacity
+  if (slots.length === 0 || slotIndex >= slots.length || placed.size >= slots.length) {
+    slots = buildSlots(placed.size + 1);
+    slotIndex = 0;
+  }
+
+  const slot = slots[slotIndex % slots.length];
   slotIndex++;
-  const wordObj = { id, name, x: slot.x, y: slot.y, rot: (Math.random() * 10 - 5) * (Math.PI / 180), color: pickColor(name), fontPx: getTargetFontSize(placed.size + 1), featured: false };
+  const targetFont = getTargetFontSize(placed.size + 1);
+  const wordObj = { id, name, x: slot.x, y: slot.y, rot: (Math.random() * 10 - 5) * (Math.PI / 180), color: pickColor(name), fontPx: targetFont, featured: false };
   placed.set(id, wordObj); counterEl.textContent = placed.size;
 
   if (immediate) stampWord(baseCtx, wordObj, 1);
@@ -418,6 +438,7 @@ function drawTitle(t) {
 const source = new EventSource('/api/events');
 source.addEventListener('sync', (e) => {
   const data = JSON.parse(e.data); placed.clear(); slotIndex = 0;
+  slots = buildSlots(data.names.length);
   baseCtx.clearRect(0, 0, W, H); drawIdleOutline();
   for (const n of data.names) if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, true);
   if (data.sceneState.state === 'title') titleAnim = { start: performance.now() }; 
@@ -427,7 +448,7 @@ source.addEventListener('sync', (e) => {
 source.addEventListener('name:new', (e) => assignAndDraw(JSON.parse(e.data).id, JSON.parse(e.data).name, JSON.parse(e.data).featured, false));
 source.addEventListener('name:hidden', (e) => { placed.delete(JSON.parse(e.data).id); rebuildSlotsAndRedraw(); });
 source.addEventListener('name:deleted', (e) => { placed.delete(JSON.parse(e.data).id); rebuildSlotsAndRedraw(); });
-source.addEventListener('name:reset', () => { placed.clear(); slotIndex = 0; titleAnim = null; zoomAnim = null; dimAlpha = 0; counterEl.textContent = '0'; baseCtx.clearRect(0, 0, W, H); drawIdleOutline(); });
+source.addEventListener('name:reset', () => { placed.clear(); slotIndex = 0; titleAnim = null; zoomAnim = null; dimAlpha = 0; counterEl.textContent = '0'; slots = buildSlots(1); baseCtx.clearRect(0, 0, W, H); drawIdleOutline(); });
 
 source.addEventListener('scene:change', (e) => {
   const scene = JSON.parse(e.data);
