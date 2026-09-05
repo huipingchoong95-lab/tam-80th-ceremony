@@ -216,7 +216,6 @@ function buildSlots(totalCount = 50) {
 
   const img = octx.getImageData(0, 0, W, H).data;
   
-  // Dynamically shrink cell spacing as total participant count grows to ensure high density
   let cellSize = 36;
   if (totalCount > 150) cellSize = 14;
   else if (totalCount > 100) cellSize = 18;
@@ -225,12 +224,12 @@ function buildSlots(totalCount = 50) {
   
   cellSize = Math.max(12, Math.floor(cellSize));
   const result = [];
-  const reservedRadius = Math.min(W, H) * 0.18;
 
+  // Removed reservedRadius check so inner loops/holes of 8 and 0 fill up completely
   for (let y = cellSize / 2; y < H; y += cellSize) {
     for (let x = cellSize / 2; x < W; x += cellSize) {
       if (img[(Math.floor(y) * W + Math.floor(x)) * 4 + 3] > 128) {
-        if (Math.hypot(x - W / 2, y - H / 2) > reservedRadius) result.push({ x, y, cellSize });
+        result.push({ x, y, cellSize });
       }
     }
   }
@@ -249,7 +248,7 @@ function getTargetFontSize(totalCount) {
   if (totalCount <= 60) return Math.min(W * 0.012, 16);
   if (totalCount <= 100) return Math.min(W * 0.0095, 12);
   if (totalCount <= 150) return Math.min(W * 0.0075, 10);
-  return Math.min(W * 0.006, 8); // Scaled down neatly for 150+ names so all remain visible and distinct
+  return Math.min(W * 0.006, 8);
 }
 
 function checkIsPresident(name, featured) {
@@ -311,7 +310,6 @@ function assignAndDraw(id, name, featured, immediate) {
     return;
   }
 
-  // Automatically rebuild/expand slot grid density if we run out of slots or capacity
   if (slots.length === 0 || slotIndex >= slots.length || placed.size >= slots.length) {
     slots = buildSlots(placed.size + 1);
     slotIndex = 0;
