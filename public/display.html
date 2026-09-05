@@ -4,46 +4,58 @@
 <meta charset="utf-8">
 <title>TAM Penang 80th Anniversary — Wall of Names</title>
 <style>
-  html, body { margin: 0; padding: 0; height: 100%; background: #0a1420; overflow: hidden; font-family: sans-serif; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #040914; overflow: hidden; font-family: sans-serif; cursor: default; }
   canvas { position: absolute; top: 0; left: 0; }
+  #bg { z-index: 1; }
+  #base { z-index: 2; }
+  #fx { z-index: 3; pointer-events: none; }
   
   #hud {
     position: absolute; top: 32px; left: 36px; z-index: 10;
     display: flex; align-items: center; gap: 16px;
-    background: rgba(19, 31, 46, 0.85); backdrop-filter: blur(12px);
-    padding: 16px 28px; border-radius: 40px; border: 2px solid rgba(255,255,255,0.2);
-    color: #fff; font-size: 22px; font-weight: 600;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    background: rgba(10, 20, 35, 0.7); backdrop-filter: blur(12px);
+    padding: 16px 28px; border-radius: 40px; border: 1px solid rgba(0, 255, 204, 0.3);
+    color: #e0f2fe; font-size: 22px; font-weight: 600;
+    box-shadow: 0 4px 24px rgba(0, 255, 204, 0.15);
   }
-  #counter { color: #f2c14e; font-size: 32px; font-weight: 800; }
+  #counter { color: #00ffcc; font-size: 32px; font-weight: 800; text-shadow: 0 0 10px rgba(0,255,204,0.5); }
 
   #qr-hud {
     position: absolute; top: 32px; right: 36px; z-index: 10;
-    background: rgba(19, 31, 46, 0.90); backdrop-filter: blur(12px);
-    padding: 20px; border-radius: 20px; border: 2px solid rgba(255,255,255,0.2);
+    background: rgba(10, 20, 35, 0.7); backdrop-filter: blur(12px);
+    padding: 20px; border-radius: 20px; border: 1px solid rgba(0, 255, 204, 0.3);
     text-align: center; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 24px rgba(0, 255, 204, 0.15);
   }
   #qr-hud img { width: 220px; height: 220px; border-radius: 12px; background: #fff; padding: 6px; }
-  #qr-hud span { font-size: 16px; font-weight: 600; color: #dce8f7; letter-spacing: 0.5px; }
+  #qr-hud span { font-size: 16px; font-weight: 600; color: #00ffcc; letter-spacing: 0.5px; }
+  
+  #audio-hint {
+    position: absolute; bottom: 16px; left: 24px; z-index: 10;
+    color: rgba(0, 255, 204, 0.5); font-size: 12px;
+  }
 </style>
 </head>
 <body>
+  <!-- Layered Canvas System -->
+  <canvas id="bg"></canvas>
   <canvas id="base"></canvas>
   <canvas id="fx"></canvas>
 
   <div id="hud">
-    <span>Participants Joined:</span>
+    <span>Nodes Connected:</span>
     <span id="counter">0</span>
   </div>
 
   <div id="qr-hud">
     <img id="qr-img" src="" alt="Scan QR">
-    <span>Scan to Join Shape</span>
+    <span>Scan to Join Network</span>
   </div>
+  
+  <div id="audio-hint">Click screen once to enable audio context</div>
 
 <script>
-const PALETTE = ['#ffffff', '#dce8f7', '#9fc4ea'];
+const PALETTE = ['#ffffff', '#bae6fd', '#7dd3fc', '#00ffcc'];
 const FEATURED_COLOR = '#f2c14e';
 const SHAPE_TEXT = '80';
 const TITLE_LINE1 = '80th Anniversary';
@@ -54,54 +66,79 @@ const ZOOM_HOLD_MS = 2200;
 const ZOOM_OUT_MS = 900;
 const TITLE_IN_MS = 1200;
 
+// Web Audio API for synthesized explosions
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContext();
+
+document.addEventListener('click', () => {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  document.getElementById('audio-hint').style.display = 'none';
+}, { once: true });
+
+function playBoom() {
+  if (audioCtx.state === 'suspended') return;
+  const bufferSize = audioCtx.sampleRate * 1.2;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; // White noise
+  
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(600, audioCtx.currentTime);
+  filter.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 1.2);
+  
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.2);
+  
+  noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+  noise.start();
+}
+
 const tamLogo = new Image();
 tamLogo.onload = () => { if (titleAnim) ensureLoop(); };
 tamLogo.src = './tam-logo.png';
 
+const bgCanvas = document.getElementById('bg');
 const baseCanvas = document.getElementById('base');
 const fxCanvas = document.getElementById('fx');
+const bgCtx = bgCanvas.getContext('2d');
 const baseCtx = baseCanvas.getContext('2d');
 const fxCtx = fxCanvas.getContext('2d');
 const counterEl = document.getElementById('counter');
 
 let W = 0, H = 0, DPR = 1;
-let slots = [];
-let placed = new Map();
-let slotIndex = 0;
-let animatingWords = [];
-let loopRunning = false;
-let banner = null;
-let dimAlpha = 0;
-let zoomAnim = null;
-let titleAnim = null;
+let slots = [], placed = new Map(), slotIndex = 0;
+let animatingWords = [], loopRunning = false;
+let dimAlpha = 0, zoomAnim = null, titleAnim = null;
+let fireworks = [], particles = [], netNodes = [];
 
-let fireworks = [];
-let particles = [];
+// Initialize Network Background Nodes
+for(let i=0; i<60; i++) {
+  netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
+}
 
 class Firework {
   constructor() {
-    this.x = Math.random() * W;
-    this.y = H;
+    this.x = Math.random() * W; this.y = H;
     this.targetY = Math.random() * (H * 0.4) + (H * 0.1);
-    this.speed = Math.random() * 3 + 7;
+    this.speed = Math.random() * 4 + 8;
     this.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
     this.alive = true;
   }
   update() {
     this.y -= this.speed;
-    if (this.y <= this.targetY) {
-      this.alive = false;
-      this.explode();
-    }
+    if (this.y <= this.targetY) { this.alive = false; this.explode(); }
   }
   explode() {
-    for (let i = 0; i < 40; i++) particles.push(new Particle(this.x, this.y, this.color));
+    playBoom();
+    for (let i = 0; i < 50; i++) particles.push(new Particle(this.x, this.y, this.color));
   }
   draw() {
     fxCtx.fillStyle = this.color;
-    fxCtx.beginPath();
-    fxCtx.arc(this.x, this.y, 3, 0, Math.PI * 2);
-    fxCtx.fill();
+    fxCtx.beginPath(); fxCtx.arc(this.x, this.y, 3, 0, Math.PI * 2); fxCtx.fill();
   }
 }
 
@@ -109,11 +146,9 @@ class Particle {
   constructor(x, y, color) {
     this.x = x; this.y = y;
     const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 6 + 2;
-    this.vx = Math.cos(angle) * speed;
-    this.vy = Math.sin(angle) * speed;
-    this.alpha = 1;
-    this.decay = Math.random() * 0.02 + 0.015;
+    const speed = Math.random() * 7 + 2;
+    this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed;
+    this.alpha = 1; this.decay = Math.random() * 0.02 + 0.015;
     this.color = color;
   }
   update() {
@@ -121,12 +156,9 @@ class Particle {
     this.vy += 0.08; this.alpha -= this.decay;
   }
   draw() {
-    fxCtx.save();
-    fxCtx.globalAlpha = Math.max(0, this.alpha);
+    fxCtx.save(); fxCtx.globalAlpha = Math.max(0, this.alpha);
     fxCtx.fillStyle = this.color;
-    fxCtx.beginPath();
-    fxCtx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
-    fxCtx.fill();
+    fxCtx.beginPath(); fxCtx.arc(this.x, this.y, 2.5, 0, Math.PI * 2); fxCtx.fill();
     fxCtx.restore();
   }
 }
@@ -135,48 +167,59 @@ fetch('/api/qr').then(res => res.json()).then(data => { document.getElementById(
 
 function resize() {
   DPR = window.devicePixelRatio || 1;
-  W = window.innerWidth;
-  H = window.innerHeight;
-  for (const c of [baseCanvas, fxCanvas]) {
+  W = window.innerWidth; H = window.innerHeight;
+  for (const c of [bgCanvas, baseCanvas, fxCanvas]) {
     c.width = W * DPR; c.height = H * DPR;
     c.style.width = W + 'px'; c.style.height = H + 'px';
+    c.getContext('2d').setTransform(DPR, 0, 0, DPR, 0, 0);
   }
-  baseCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  fxCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
   rebuildSlotsAndRedraw();
 }
 window.addEventListener('resize', resize);
 
-// BUILD SLOTS WITH CENTER EXCLUSION ZONE
+function animateBg() {
+  bgCtx.clearRect(0, 0, W, H);
+  for(let i=0; i<netNodes.length; i++) {
+    let n = netNodes[i];
+    n.x += n.vx; n.y += n.vy;
+    if(n.x < 0 || n.x > 1) n.vx *= -1;
+    if(n.y < 0 || n.y > 1) n.vy *= -1;
+    
+    let px = n.x * W, py = n.y * H;
+    bgCtx.fillStyle = '#0a2a3f';
+    bgCtx.beginPath(); bgCtx.arc(px, py, 2, 0, Math.PI*2); bgCtx.fill();
+    
+    for(let j=i+1; j<netNodes.length; j++) {
+      let n2 = netNodes[j];
+      let p2x = n2.x * W, p2y = n2.y * H;
+      let dist = Math.hypot(px - p2x, py - p2y);
+      if(dist < 150) {
+        bgCtx.strokeStyle = `rgba(0, 255, 204, ${0.15 * (1 - dist/150)})`;
+        bgCtx.beginPath(); bgCtx.moveTo(px, py); bgCtx.lineTo(p2x, p2y); bgCtx.stroke();
+      }
+    }
+  }
+  requestAnimationFrame(animateBg);
+}
+requestAnimationFrame(animateBg); // Start background loop
+
 function buildSlots() {
-  const off = document.createElement('canvas');
-  off.width = W; off.height = H;
+  const off = document.createElement('canvas'); off.width = W; off.height = H;
   const octx = off.getContext('2d');
   const fontPx = Math.min(H * 0.75, W * 0.45);
   octx.font = `bold ${fontPx}px Arial, sans-serif`;
-  octx.textAlign = 'center';
-  octx.textBaseline = 'middle';
-  octx.fillStyle = '#fff';
+  octx.textAlign = 'center'; octx.textBaseline = 'middle'; octx.fillStyle = '#fff';
   octx.fillText(SHAPE_TEXT, W / 2, H / 2);
 
   const img = octx.getImageData(0, 0, W, H).data;
   const cellSize = Math.max(24, Math.floor(W / 40));
   const result = [];
-  
-  // Reserved center radius (keeps participants away from President's middle spot)
   const reservedRadius = Math.min(W, H) * 0.16;
 
   for (let y = cellSize / 2; y < H; y += cellSize) {
     for (let x = cellSize / 2; x < W; x += cellSize) {
       if (img[(Math.floor(y) * W + Math.floor(x)) * 4 + 3] > 128) {
-        const dx = x - (W / 2);
-        const dy = y - (H / 2);
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        // Exclude central spot for President
-        if (dist > reservedRadius) {
-          result.push({ x, y, cellSize });
-        }
+        if (Math.hypot(x - W / 2, y - H / 2) > reservedRadius) result.push({ x, y, cellSize });
       }
     }
   }
@@ -188,30 +231,25 @@ function buildSlots() {
   return result;
 }
 
-// Dynamic Large Font Sizing Strategy
 function getTargetFontSize(totalCount) {
-  if (totalCount <= 5) return Math.min(W * 0.038, 52);   // Large visible text for early joiners
+  if (totalCount <= 5) return Math.min(W * 0.038, 52);
   if (totalCount <= 15) return Math.min(W * 0.030, 40);
   if (totalCount <= 30) return Math.min(W * 0.024, 30);
   if (totalCount <= 60) return Math.min(W * 0.018, 22);
   return Math.min(W * 0.014, 16);
 }
 
-// Broad detection for President / VIP names
 function checkIsPresident(name, featured) {
   if (featured === true || featured === 'true' || featured === 1) return true;
   if (typeof name === 'string') {
-    const lower = name.toLowerCase();
-    if (lower.includes('president') || lower.includes('vip') || lower.includes('soon') || lower.includes('ts.')) {
-      return true;
-    }
+    const l = name.toLowerCase();
+    if (l.includes('president') || l.includes('vip') || l.includes('soon') || l.includes('ts.')) return true;
   }
   return false;
 }
 
 function rebuildSlotsAndRedraw() {
-  slots = buildSlots();
-  slotIndex = 0;
+  slots = buildSlots(); slotIndex = 0;
   const entries = Array.from(placed.values());
   placed.clear();
   baseCtx.clearRect(0, 0, W, H);
@@ -220,13 +258,14 @@ function rebuildSlotsAndRedraw() {
 }
 
 function drawIdleOutline() {
-  if (placed.size > 0) return;
+  // Deliberately no longer returning early. The shape stays as a hologram.
   baseCtx.save();
   baseCtx.font = `bold ${Math.min(H * 0.75, W * 0.45)}px Arial, sans-serif`;
-  baseCtx.textAlign = 'center';
-  baseCtx.textBaseline = 'middle';
-  baseCtx.strokeStyle = 'rgba(255,255,255,0.12)';
-  baseCtx.lineWidth = 2;
+  baseCtx.textAlign = 'center'; baseCtx.textBaseline = 'middle';
+  baseCtx.strokeStyle = 'rgba(0, 255, 204, 0.12)';
+  baseCtx.lineWidth = 3;
+  baseCtx.shadowColor = 'rgba(0, 255, 204, 0.6)';
+  baseCtx.shadowBlur = 15;
   baseCtx.strokeText(SHAPE_TEXT, W / 2, H / 2);
   baseCtx.restore();
 }
@@ -237,67 +276,36 @@ function pickColor(name) {
   return PALETTE[hash % PALETTE.length];
 }
 
-function nextSlot() {
-  if (slots.length === 0) return { x: W / 2, y: H / 2, cellSize: 40 };
-  const s = slots[slotIndex % slots.length];
-  slotIndex++;
-  return s;
-}
-
 function updateAllFontSizesExcept(excludeId) {
   const targetFont = getTargetFontSize(placed.size);
   baseCtx.clearRect(0, 0, W, H);
   drawIdleOutline();
-  
   for (const w of placed.values()) {
     if (w.id === excludeId) continue;
-    if (!w.featured) {
-      w.fontPx = targetFont;
-    }
+    if (!w.featured) w.fontPx = targetFont;
     stampWord(baseCtx, w, 1);
   }
 }
 
 function assignAndDraw(id, name, featured, immediate) {
   if (placed.has(id)) return;
-
   const isPres = checkIsPresident(name, featured);
 
-  // If President/VIP: Anchor explicitly to dead center (W/2, H/2)
   if (isPres) {
-    const centerFontPx = Math.max(56, Math.min(W * 0.055, 84));
-    const wordObj = {
-      id, name,
-      x: W / 2, y: H / 2,
-      rot: 0,
-      color: FEATURED_COLOR,
-      fontPx: centerFontPx,
-      featured: true
-    };
-    placed.set(id, wordObj);
-    counterEl.textContent = placed.size;
-
+    const wordObj = { id, name, x: W / 2, y: H / 2, rot: 0, color: FEATURED_COLOR, fontPx: Math.max(56, Math.min(W * 0.055, 84)), featured: true };
+    placed.set(id, wordObj); counterEl.textContent = placed.size;
     if (immediate) stampWord(baseCtx, wordObj, 1);
-    else {
-      animatingWords.push({ ...wordObj, start: performance.now() });
-      ensureLoop();
-    }
+    else { animatingWords.push({ ...wordObj, start: performance.now() }); ensureLoop(); }
     return;
   }
 
-  // Regular Participant Logic
-  const slot = nextSlot();
-  const targetFontPx = getTargetFontSize(placed.size + 1);
-  const rot = (Math.random() * 12 - 6) * (Math.PI / 180);
-  const color = pickColor(name);
+  const slot = slots.length === 0 ? { x: W / 2, y: H / 2 } : slots[slotIndex % slots.length];
+  slotIndex++;
+  const wordObj = { id, name, x: slot.x, y: slot.y, rot: (Math.random() * 12 - 6) * (Math.PI / 180), color: pickColor(name), fontPx: getTargetFontSize(placed.size + 1), featured: false };
+  placed.set(id, wordObj); counterEl.textContent = placed.size;
 
-  const wordObj = { id, name, x: slot.x, y: slot.y, rot, color, fontPx: targetFontPx, featured: false };
-  placed.set(id, wordObj);
-  counterEl.textContent = placed.size;
-
-  if (immediate) {
-    stampWord(baseCtx, wordObj, 1);
-  } else {
+  if (immediate) stampWord(baseCtx, wordObj, 1);
+  else {
     updateAllFontSizesExcept(id);
     animatingWords.push({ ...wordObj, start: performance.now() });
     ensureLoop();
@@ -305,33 +313,19 @@ function assignAndDraw(id, name, featured, immediate) {
 }
 
 function stampWord(ctx, w, scale) {
-  ctx.save();
-  ctx.translate(w.x, w.y);
-  ctx.rotate(w.rot);
-  ctx.scale(scale, scale);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  
+  ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.rot); ctx.scale(scale, scale);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (w.featured) {
     ctx.font = `800 ${w.fontPx}px Arial, sans-serif`;
-    ctx.shadowColor = 'rgba(242, 193, 78, 0.9)';
-    ctx.shadowBlur = 30;
-    ctx.fillStyle = FEATURED_COLOR;
+    ctx.shadowColor = 'rgba(242, 193, 78, 0.9)'; ctx.shadowBlur = 30; ctx.fillStyle = FEATURED_COLOR;
   } else {
     ctx.font = `700 ${w.fontPx}px Arial, sans-serif`;
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 4;
-    ctx.fillStyle = w.color;
+    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 6; ctx.fillStyle = w.color;
   }
-  
-  ctx.fillText(w.name, 0, 0);
-  ctx.restore();
+  ctx.fillText(w.name, 0, 0); ctx.restore();
 }
 
-function easeOutBack(t) {
-  const c1 = 1.70158, c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-}
+function easeOutBack(t) { const c1 = 1.70158; return 1 + (c1 + 1) * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
 function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
 function loop(now) {
@@ -339,39 +333,33 @@ function loop(now) {
   let stillActive = false;
 
   for (let i = animatingWords.length - 1; i >= 0; i--) {
-    const w = animatingWords[i];
-    const t = Math.min(1, (now - w.start) / POPIN_MS);
+    const w = animatingWords[i]; const t = Math.min(1, (now - w.start) / POPIN_MS);
     if (t >= 1) { stampWord(baseCtx, w, 1); animatingWords.splice(i, 1); }
     else { stampWord(fxCtx, w, easeOutBack(t)); stillActive = true; }
   }
 
   if (dimAlpha > 0) {
-    fxCtx.save(); fxCtx.fillStyle = `rgba(0,0,0,${dimAlpha})`; fxCtx.fillRect(0, 0, W, H); fxCtx.restore();
+    fxCtx.save(); fxCtx.fillStyle = `rgba(4,9,20,${dimAlpha})`; fxCtx.fillRect(0, 0, W, H); fxCtx.restore();
   }
 
   if (zoomAnim) {
     const elapsed = now - zoomAnim.start;
     if (elapsed < ZOOM_IN_MS) {
-      dimAlpha = Math.min(0.6, (elapsed / ZOOM_IN_MS) * 0.6);
-      drawZoomName(zoomAnim, easeOutBack(Math.min(1, elapsed / ZOOM_IN_MS)), 1);
-      stillActive = true;
+      dimAlpha = Math.min(0.7, (elapsed / ZOOM_IN_MS) * 0.7);
+      drawZoomName(zoomAnim, easeOutBack(Math.min(1, elapsed / ZOOM_IN_MS)), 1); stillActive = true;
     } else if (elapsed < ZOOM_IN_MS + ZOOM_HOLD_MS) {
-      dimAlpha = 0.6; drawZoomName(zoomAnim, 1, 1); stillActive = true;
+      dimAlpha = 0.7; drawZoomName(zoomAnim, 1, 1); stillActive = true;
     } else if (elapsed < ZOOM_IN_MS + ZOOM_HOLD_MS + ZOOM_OUT_MS) {
-      const t = (elapsed - ZOOM_IN_MS - ZOOM_HOLD_MS) / ZOOM_OUT_MS;
-      const eased = easeInOutCubic(t);
-      dimAlpha = 0.6 * (1 - eased);
-      drawZoomName(zoomAnim, 1, 1 - eased);
-      stillActive = true;
+      const eased = easeInOutCubic((elapsed - ZOOM_IN_MS - ZOOM_HOLD_MS) / ZOOM_OUT_MS);
+      dimAlpha = 0.7 * (1 - eased); drawZoomName(zoomAnim, 1, 1 - eased); stillActive = true;
     } else { dimAlpha = 0; zoomAnim = null; }
   }
 
   if (titleAnim) {
     const elapsed = now - titleAnim.start;
-    const t = Math.min(1, elapsed / TITLE_IN_MS);
-    dimAlpha = Math.max(dimAlpha, 0.7);
+    dimAlpha = Math.max(dimAlpha, 0.85);
     if (Math.random() < 0.08) fireworks.push(new Firework());
-    drawTitle(easeOutBack(t));
+    drawTitle(easeOutBack(Math.min(1, elapsed / TITLE_IN_MS)));
     stillActive = true;
   }
 
@@ -379,7 +367,6 @@ function loop(now) {
     fireworks[i].update(); fireworks[i].draw();
     if (!fireworks[i].alive) fireworks.splice(i, 1);
   }
-
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update(); particles[i].draw();
     if (particles[i].alpha <= 0) particles.splice(i, 1);
@@ -389,29 +376,20 @@ function loop(now) {
   else loopRunning = false;
 }
 
-function ensureLoop() {
-  if (!loopRunning) { loopRunning = true; requestAnimationFrame(loop); }
-}
+function ensureLoop() { if (!loopRunning) { loopRunning = true; requestAnimationFrame(loop); } }
 
 function drawZoomName(anim, growT, shrinkT) {
   const bigFontPx = Math.min(H * 0.16, W * 0.09);
-  const start = { x: W / 2, y: H / 2, fontPx: bigFontPx * 0.15 };
-  const big = { x: W / 2, y: H * 0.46, fontPx: bigFontPx };
+  const start = { x: W / 2, y: H / 2, fontPx: bigFontPx * 0.15 }, big = { x: W / 2, y: H * 0.46, fontPx: bigFontPx };
   const end = { x: anim.targetSlot.x, y: anim.targetSlot.y, fontPx: anim.targetFontPx };
-  let x, y, fontPx;
-  
-  if (shrinkT === 1) {
-    x = start.x + (big.x - start.x) * growT; y = start.y + (big.y - start.y) * growT;
-    fontPx = start.fontPx + (big.fontPx - start.fontPx) * growT;
-  } else {
-    const scaleOut = 1 - shrinkT;
-    x = big.x + (end.x - big.x) * scaleOut; y = big.y + (end.y - big.y) * scaleOut;
-    fontPx = big.fontPx + (end.fontPx - big.fontPx) * scaleOut;
-  }
+  let x = shrinkT === 1 ? start.x + (big.x - start.x) * growT : big.x + (end.x - big.x) * (1 - shrinkT);
+  let y = shrinkT === 1 ? start.y + (big.y - start.y) * growT : big.y + (end.y - big.y) * (1 - shrinkT);
+  let fontPx = shrinkT === 1 ? start.fontPx + (big.fontPx - start.fontPx) * growT : big.fontPx + (end.fontPx - big.fontPx) * (1 - shrinkT);
 
   fxCtx.save(); fxCtx.translate(x, y);
   fxCtx.font = `700 ${fontPx}px Arial, sans-serif`;
   fxCtx.textAlign = 'center'; fxCtx.textBaseline = 'middle';
+  fxCtx.shadowColor = 'rgba(242, 193, 78, 1)'; fxCtx.shadowBlur = 40;
   fxCtx.fillStyle = FEATURED_COLOR; fxCtx.fillText(anim.name, 0, 0); fxCtx.restore();
 }
 
@@ -420,61 +398,39 @@ function drawTitle(t) {
   fxCtx.textAlign = 'center'; fxCtx.textBaseline = 'middle';
   
   if (tamLogo.complete && tamLogo.naturalWidth > 0) {
-    const maxLogoW = Math.min(W * 0.4, 380);
-    const aspect = tamLogo.naturalHeight / tamLogo.naturalWidth;
+    const maxLogoW = Math.min(W * 0.4, 380), aspect = tamLogo.naturalHeight / tamLogo.naturalWidth;
     const logoW = maxLogoW * t, logoH = (maxLogoW * aspect) * t, logoY = H * 0.28;
-    const padX = 16 * t, padY = 8 * t;
+    const pad = 12 * t;
     
-    fxCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    fxCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     if (fxCtx.roundRect) {
-      fxCtx.beginPath(); fxCtx.roundRect(W / 2 - logoW / 2 - padX, logoY - logoH / 2 - padY, logoW + padX * 2, logoH + padY * 2, 10); fxCtx.fill();
-    } else fxCtx.fillRect(W / 2 - logoW / 2 - padX, logoY - logoH / 2 - padY, logoW + padX * 2, logoH + padY * 2);
-    
+      fxCtx.beginPath(); fxCtx.roundRect(W / 2 - logoW / 2 - pad, logoY - logoH / 2 - pad, logoW + pad * 2, logoH + pad * 2, 10); fxCtx.fill();
+    } else fxCtx.fillRect(W / 2 - logoW / 2 - pad, logoY - logoH / 2 - pad, logoW + pad * 2, logoH + pad * 2);
     fxCtx.drawImage(tamLogo, W / 2 - logoW / 2, logoY - logoH / 2, logoW, logoH);
   }
 
   const size1 = (Math.min(H * 0.08, W * 0.055)) * (0.2 + 0.8 * t);
   fxCtx.fillStyle = '#ffffff'; fxCtx.font = `600 ${size1}px Arial, sans-serif`; fxCtx.fillText(TITLE_LINE1, W / 2, H * 0.52);
-  fxCtx.fillStyle = FEATURED_COLOR; fxCtx.font = `700 ${size1 * 1.3}px Arial, sans-serif`; fxCtx.fillText(TITLE_LINE2, W / 2, H * 0.65);
+  fxCtx.fillStyle = FEATURED_COLOR; fxCtx.font = `800 ${size1 * 1.4}px Arial, sans-serif`;
+  fxCtx.shadowColor = FEATURED_COLOR; fxCtx.shadowBlur = 20; fxCtx.fillText(TITLE_LINE2, W / 2, H * 0.65);
   fxCtx.restore();
 }
 
 const source = new EventSource('/api/events');
-
 source.addEventListener('sync', (e) => {
-  const data = JSON.parse(e.data);
-  placed.clear(); slotIndex = 0;
+  const data = JSON.parse(e.data); placed.clear(); slotIndex = 0;
   baseCtx.clearRect(0, 0, W, H); drawIdleOutline();
   for (const n of data.names) if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, true);
-  counterEl.textContent = placed.size; applyScene(data.sceneState);
+  if (data.sceneState.state === 'title') titleAnim = { start: performance.now() }; ensureLoop();
 });
-
-source.addEventListener('name:new', (e) => {
-  const n = JSON.parse(e.data);
-  assignAndDraw(n.id, n.name, n.featured, false);
+source.addEventListener('name:new', (e) => assignAndDraw(JSON.parse(e.data).id, JSON.parse(e.data).name, JSON.parse(e.data).featured, false));
+source.addEventListener('name:hidden', (e) => { placed.delete(JSON.parse(e.data).id); rebuildSlotsAndRedraw(); });
+source.addEventListener('name:reset', () => { placed.clear(); slotIndex = 0; titleAnim = null; dimAlpha = 0; counterEl.textContent = '0'; baseCtx.clearRect(0, 0, W, H); drawIdleOutline(); });
+source.addEventListener('scene:change', (e) => {
+  const scene = JSON.parse(e.data);
+  if (scene.state === 'zoom') { zoomAnim = { name: scene.payload.name, targetSlot: { x: W / 2, y: H / 2 }, targetFontPx: 80, start: performance.now() }; ensureLoop(); }
+  else if (scene.state === 'title') { titleAnim = { start: performance.now() }; ensureLoop(); }
 });
-
-source.addEventListener('name:hidden', (e) => {
-  const { id } = JSON.parse(e.data);
-  placed.delete(id); counterEl.textContent = placed.size; rebuildSlotsAndRedraw();
-});
-
-source.addEventListener('name:reset', () => {
-  placed.clear(); slotIndex = 0; animatingWords = []; zoomAnim = null; titleAnim = null;
-  dimAlpha = 0; counterEl.textContent = '0';
-  baseCtx.clearRect(0, 0, W, H); fxCtx.clearRect(0, 0, W, H); drawIdleOutline();
-});
-
-source.addEventListener('scene:change', (e) => applyScene(JSON.parse(e.data)));
-
-function applyScene(scene) {
-  if (scene.state === 'frozen') { banner = { text: 'The shape is complete!', start: performance.now(), duration: 3000 }; ensureLoop(); }
-  else if (scene.state === 'zoom' && scene.payload && scene.payload.name) {
-    const target = Array.from(placed.values()).find(w => w.name.toLowerCase() === scene.payload.name.toLowerCase());
-    zoomAnim = { name: scene.payload.name, targetSlot: target ? { x: target.x, y: target.y } : { x: W / 2, y: H / 2 }, targetFontPx: target ? target.fontPx : Math.min(H * 0.78, W * 0.46) * 0.06, start: performance.now() }; ensureLoop();
-  } else if (scene.state === 'title') { titleAnim = { start: performance.now() }; ensureLoop(); }
-}
-
 resize();
 </script>
 </body>
