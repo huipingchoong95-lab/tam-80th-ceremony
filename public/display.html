@@ -7,7 +7,6 @@
   html, body { margin: 0; padding: 0; height: 100%; background: #0a1420; overflow: hidden; font-family: sans-serif; }
   canvas { position: absolute; top: 0; left: 0; }
   
-  /* Larger Counter HUD */
   #hud {
     position: absolute; top: 32px; left: 36px; z-index: 10;
     display: flex; align-items: center; gap: 16px;
@@ -18,7 +17,6 @@
   }
   #counter { color: #f2c14e; font-size: 32px; font-weight: 800; }
 
-  /* Extra Large QR Badge HUD for Stage Projection */
   #qr-hud {
     position: absolute; top: 32px; right: 36px; z-index: 10;
     background: rgba(19, 31, 46, 0.90); backdrop-filter: blur(12px);
@@ -56,11 +54,8 @@ const ZOOM_HOLD_MS = 2200;
 const ZOOM_OUT_MS = 900;
 const TITLE_IN_MS = 1200;
 
-// Preload Official TAM Logo
 const tamLogo = new Image();
-tamLogo.onload = () => {
-  if (titleAnim) ensureLoop();
-};
+tamLogo.onload = () => { if (titleAnim) ensureLoop(); };
 tamLogo.src = './tam-logo.png';
 
 const baseCanvas = document.getElementById('base');
@@ -80,7 +75,6 @@ let dimAlpha = 0;
 let zoomAnim = null;
 let titleAnim = null;
 
-// Fireworks System
 let fireworks = [];
 let particles = [];
 
@@ -101,10 +95,7 @@ class Firework {
     }
   }
   explode() {
-    const particleCount = 40;
-    for (let i = 0; i < particleCount; i++) {
-      particles.push(new Particle(this.x, this.y, this.color));
-    }
+    for (let i = 0; i < 40; i++) particles.push(new Particle(this.x, this.y, this.color));
   }
   draw() {
     fxCtx.fillStyle = this.color;
@@ -116,8 +107,7 @@ class Firework {
 
 class Particle {
   constructor(x, y, color) {
-    this.x = x;
-    this.y = y;
+    this.x = x; this.y = y;
     const angle = Math.random() * Math.PI * 2;
     const speed = Math.random() * 6 + 2;
     this.vx = Math.cos(angle) * speed;
@@ -127,10 +117,8 @@ class Particle {
     this.color = color;
   }
   update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.vy += 0.08;
-    this.alpha -= this.decay;
+    this.x += this.vx; this.y += this.vy;
+    this.vy += 0.08; this.alpha -= this.decay;
   }
   draw() {
     fxCtx.save();
@@ -143,22 +131,15 @@ class Particle {
   }
 }
 
-// Fetch QR Code
-fetch('/api/qr')
-  .then(res => res.json())
-  .then(data => {
-    document.getElementById('qr-img').src = data.qr;
-  });
+fetch('/api/qr').then(res => res.json()).then(data => { document.getElementById('qr-img').src = data.qr; });
 
 function resize() {
   DPR = window.devicePixelRatio || 1;
   W = window.innerWidth;
   H = window.innerHeight;
   for (const c of [baseCanvas, fxCanvas]) {
-    c.width = W * DPR;
-    c.height = H * DPR;
-    c.style.width = W + 'px';
-    c.style.height = H + 'px';
+    c.width = W * DPR; c.height = H * DPR;
+    c.style.width = W + 'px'; c.style.height = H + 'px';
   }
   baseCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
   fxCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -166,12 +147,12 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
+// BUILD SLOTS WITH CENTER EXCLUSION ZONE
 function buildSlots() {
   const off = document.createElement('canvas');
   off.width = W; off.height = H;
   const octx = off.getContext('2d');
-  octx.clearRect(0, 0, W, H);
-  const fontPx = Math.min(H * 0.78, W * 0.46);
+  const fontPx = Math.min(H * 0.75, W * 0.45);
   octx.font = `bold ${fontPx}px Arial, sans-serif`;
   octx.textAlign = 'center';
   octx.textBaseline = 'middle';
@@ -179,19 +160,53 @@ function buildSlots() {
   octx.fillText(SHAPE_TEXT, W / 2, H / 2);
 
   const img = octx.getImageData(0, 0, W, H).data;
-  const cellSize = Math.max(20, Math.floor(W / 46));
+  const cellSize = Math.max(24, Math.floor(W / 40));
   const result = [];
+  
+  // Reserved center radius (keeps participants away from President's middle spot)
+  const reservedRadius = Math.min(W, H) * 0.16;
+
   for (let y = cellSize / 2; y < H; y += cellSize) {
     for (let x = cellSize / 2; x < W; x += cellSize) {
-      const idx = (Math.floor(y) * W + Math.floor(x)) * 4;
-      if (img[idx + 3] > 128) result.push({ x, y, cellSize });
+      if (img[(Math.floor(y) * W + Math.floor(x)) * 4 + 3] > 128) {
+        const dx = x - (W / 2);
+        const dy = y - (H / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Exclude central spot for President
+        if (dist > reservedRadius) {
+          result.push({ x, y, cellSize });
+        }
+      }
     }
   }
+
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
+}
+
+// Dynamic Large Font Sizing Strategy
+function getTargetFontSize(totalCount) {
+  if (totalCount <= 5) return Math.min(W * 0.038, 52);   // Large visible text for early joiners
+  if (totalCount <= 15) return Math.min(W * 0.030, 40);
+  if (totalCount <= 30) return Math.min(W * 0.024, 30);
+  if (totalCount <= 60) return Math.min(W * 0.018, 22);
+  return Math.min(W * 0.014, 16);
+}
+
+// Broad detection for President / VIP names
+function checkIsPresident(name, featured) {
+  if (featured === true || featured === 'true' || featured === 1) return true;
+  if (typeof name === 'string') {
+    const lower = name.toLowerCase();
+    if (lower.includes('president') || lower.includes('vip') || lower.includes('soon') || lower.includes('ts.')) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function rebuildSlotsAndRedraw() {
@@ -207,7 +222,7 @@ function rebuildSlotsAndRedraw() {
 function drawIdleOutline() {
   if (placed.size > 0) return;
   baseCtx.save();
-  baseCtx.font = `bold ${Math.min(H * 0.78, W * 0.46)}px Arial, sans-serif`;
+  baseCtx.font = `bold ${Math.min(H * 0.75, W * 0.45)}px Arial, sans-serif`;
   baseCtx.textAlign = 'center';
   baseCtx.textBaseline = 'middle';
   baseCtx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -216,21 +231,10 @@ function drawIdleOutline() {
   baseCtx.restore();
 }
 
-function pickColor(name, featured) {
-  if (featured) return FEATURED_COLOR;
+function pickColor(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   return PALETTE[hash % PALETTE.length];
-}
-
-function fitFont(ctx, text, maxWidth, startPx) {
-  let size = startPx;
-  ctx.font = `600 ${size}px Arial, sans-serif`;
-  while (size > 9 && ctx.measureText(text).width > maxWidth) {
-    size -= 1;
-    ctx.font = `600 ${size}px Arial, sans-serif`;
-  }
-  return size;
 }
 
 function nextSlot() {
@@ -240,23 +244,61 @@ function nextSlot() {
   return s;
 }
 
+function updateAllFontSizesExcept(excludeId) {
+  const targetFont = getTargetFontSize(placed.size);
+  baseCtx.clearRect(0, 0, W, H);
+  drawIdleOutline();
+  
+  for (const w of placed.values()) {
+    if (w.id === excludeId) continue;
+    if (!w.featured) {
+      w.fontPx = targetFont;
+    }
+    stampWord(baseCtx, w, 1);
+  }
+}
+
 function assignAndDraw(id, name, featured, immediate) {
   if (placed.has(id)) return;
+
+  const isPres = checkIsPresident(name, featured);
+
+  // If President/VIP: Anchor explicitly to dead center (W/2, H/2)
+  if (isPres) {
+    const centerFontPx = Math.max(56, Math.min(W * 0.055, 84));
+    const wordObj = {
+      id, name,
+      x: W / 2, y: H / 2,
+      rot: 0,
+      color: FEATURED_COLOR,
+      fontPx: centerFontPx,
+      featured: true
+    };
+    placed.set(id, wordObj);
+    counterEl.textContent = placed.size;
+
+    if (immediate) stampWord(baseCtx, wordObj, 1);
+    else {
+      animatingWords.push({ ...wordObj, start: performance.now() });
+      ensureLoop();
+    }
+    return;
+  }
+
+  // Regular Participant Logic
   const slot = nextSlot();
-  const rot = (Math.random() * 16 - 8) * (Math.PI / 180);
-  const color = pickColor(name, featured);
-  const targetFontPx = fitFont(
-    fxCtx, name,
-    slot.cellSize * (featured ? 1.9 : 0.92),
-    slot.cellSize * (featured ? 0.85 : 0.55)
-  );
-  const wordObj = { id, name, x: slot.x, y: slot.y, rot, color, fontPx: targetFontPx, featured: !!featured };
+  const targetFontPx = getTargetFontSize(placed.size + 1);
+  const rot = (Math.random() * 12 - 6) * (Math.PI / 180);
+  const color = pickColor(name);
+
+  const wordObj = { id, name, x: slot.x, y: slot.y, rot, color, fontPx: targetFontPx, featured: false };
   placed.set(id, wordObj);
   counterEl.textContent = placed.size;
 
   if (immediate) {
     stampWord(baseCtx, wordObj, 1);
   } else {
+    updateAllFontSizesExcept(id);
     animatingWords.push({ ...wordObj, start: performance.now() });
     ensureLoop();
   }
@@ -267,10 +309,21 @@ function stampWord(ctx, w, scale) {
   ctx.translate(w.x, w.y);
   ctx.rotate(w.rot);
   ctx.scale(scale, scale);
-  ctx.font = `600 ${w.fontPx}px Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = w.color;
+  
+  if (w.featured) {
+    ctx.font = `800 ${w.fontPx}px Arial, sans-serif`;
+    ctx.shadowColor = 'rgba(242, 193, 78, 0.9)';
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = FEATURED_COLOR;
+  } else {
+    ctx.font = `700 ${w.fontPx}px Arial, sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = w.color;
+  }
+  
   ctx.fillText(w.name, 0, 0);
   ctx.restore();
 }
@@ -279,9 +332,7 @@ function easeOutBack(t) {
   const c1 = 1.70158, c3 = c1 + 1;
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }
-function easeInOutCubic(t) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
+function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
 function loop(now) {
   fxCtx.clearRect(0, 0, W, H);
@@ -290,20 +341,12 @@ function loop(now) {
   for (let i = animatingWords.length - 1; i >= 0; i--) {
     const w = animatingWords[i];
     const t = Math.min(1, (now - w.start) / POPIN_MS);
-    if (t >= 1) {
-      stampWord(baseCtx, w, 1);
-      animatingWords.splice(i, 1);
-    } else {
-      stampWord(fxCtx, w, easeOutBack(t));
-      stillActive = true;
-    }
+    if (t >= 1) { stampWord(baseCtx, w, 1); animatingWords.splice(i, 1); }
+    else { stampWord(fxCtx, w, easeOutBack(t)); stillActive = true; }
   }
 
   if (dimAlpha > 0) {
-    fxCtx.save();
-    fxCtx.fillStyle = `rgba(0,0,0,${dimAlpha})`;
-    fxCtx.fillRect(0, 0, W, H);
-    fxCtx.restore();
+    fxCtx.save(); fxCtx.fillStyle = `rgba(0,0,0,${dimAlpha})`; fxCtx.fillRect(0, 0, W, H); fxCtx.restore();
   }
 
   if (zoomAnim) {
@@ -313,56 +356,41 @@ function loop(now) {
       drawZoomName(zoomAnim, easeOutBack(Math.min(1, elapsed / ZOOM_IN_MS)), 1);
       stillActive = true;
     } else if (elapsed < ZOOM_IN_MS + ZOOM_HOLD_MS) {
-      dimAlpha = 0.6;
-      drawZoomName(zoomAnim, 1, 1);
-      stillActive = true;
+      dimAlpha = 0.6; drawZoomName(zoomAnim, 1, 1); stillActive = true;
     } else if (elapsed < ZOOM_IN_MS + ZOOM_HOLD_MS + ZOOM_OUT_MS) {
       const t = (elapsed - ZOOM_IN_MS - ZOOM_HOLD_MS) / ZOOM_OUT_MS;
       const eased = easeInOutCubic(t);
       dimAlpha = 0.6 * (1 - eased);
       drawZoomName(zoomAnim, 1, 1 - eased);
       stillActive = true;
-    } else {
-      dimAlpha = 0;
-      zoomAnim = null;
-    }
+    } else { dimAlpha = 0; zoomAnim = null; }
   }
 
   if (titleAnim) {
     const elapsed = now - titleAnim.start;
     const t = Math.min(1, elapsed / TITLE_IN_MS);
     dimAlpha = Math.max(dimAlpha, 0.7);
-    
     if (Math.random() < 0.08) fireworks.push(new Firework());
-    
     drawTitle(easeOutBack(t));
     stillActive = true;
   }
 
   for (let i = fireworks.length - 1; i >= 0; i--) {
-    fireworks[i].update();
-    fireworks[i].draw();
+    fireworks[i].update(); fireworks[i].draw();
     if (!fireworks[i].alive) fireworks.splice(i, 1);
   }
 
   for (let i = particles.length - 1; i >= 0; i--) {
-    particles[i].update();
-    particles[i].draw();
+    particles[i].update(); particles[i].draw();
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
 
-  if (stillActive || fireworks.length > 0 || particles.length > 0) {
-    requestAnimationFrame(loop);
-  } else {
-    loopRunning = false;
-  }
+  if (stillActive || fireworks.length > 0 || particles.length > 0) requestAnimationFrame(loop);
+  else loopRunning = false;
 }
 
 function ensureLoop() {
-  if (!loopRunning) {
-    loopRunning = true;
-    requestAnimationFrame(loop);
-  }
+  if (!loopRunning) { loopRunning = true; requestAnimationFrame(loop); }
 }
 
 function drawZoomName(anim, growT, shrinkT) {
@@ -370,74 +398,44 @@ function drawZoomName(anim, growT, shrinkT) {
   const start = { x: W / 2, y: H / 2, fontPx: bigFontPx * 0.15 };
   const big = { x: W / 2, y: H * 0.46, fontPx: bigFontPx };
   const end = { x: anim.targetSlot.x, y: anim.targetSlot.y, fontPx: anim.targetFontPx };
-
   let x, y, fontPx;
+  
   if (shrinkT === 1) {
-    x = start.x + (big.x - start.x) * growT;
-    y = start.y + (big.y - start.y) * growT;
+    x = start.x + (big.x - start.x) * growT; y = start.y + (big.y - start.y) * growT;
     fontPx = start.fontPx + (big.fontPx - start.fontPx) * growT;
   } else {
     const scaleOut = 1 - shrinkT;
-    x = big.x + (end.x - big.x) * scaleOut;
-    y = big.y + (end.y - big.y) * scaleOut;
+    x = big.x + (end.x - big.x) * scaleOut; y = big.y + (end.y - big.y) * scaleOut;
     fontPx = big.fontPx + (end.fontPx - big.fontPx) * scaleOut;
   }
 
-  fxCtx.save();
-  fxCtx.translate(x, y);
+  fxCtx.save(); fxCtx.translate(x, y);
   fxCtx.font = `700 ${fontPx}px Arial, sans-serif`;
-  fxCtx.textAlign = 'center';
-  fxCtx.textBaseline = 'middle';
-  fxCtx.fillStyle = FEATURED_COLOR;
-  fxCtx.fillText(anim.name, 0, 0);
-  fxCtx.restore();
+  fxCtx.textAlign = 'center'; fxCtx.textBaseline = 'middle';
+  fxCtx.fillStyle = FEATURED_COLOR; fxCtx.fillText(anim.name, 0, 0); fxCtx.restore();
 }
 
 function drawTitle(t) {
-  fxCtx.save();
-  fxCtx.globalAlpha = Math.min(1, t + 0.15);
-  fxCtx.textAlign = 'center';
-  fxCtx.textBaseline = 'middle';
+  fxCtx.save(); fxCtx.globalAlpha = Math.min(1, t + 0.15);
+  fxCtx.textAlign = 'center'; fxCtx.textBaseline = 'middle';
   
-  // Render TAM Logo Above Title
   if (tamLogo.complete && tamLogo.naturalWidth > 0) {
-    const logoTargetWidth = Math.min(W * 0.35, 340);
-    const logoScale = logoTargetWidth / tamLogo.naturalWidth;
-    const logoW = logoTargetWidth * t;
-    const logoH = (tamLogo.naturalHeight * logoScale) * t;
+    const maxLogoW = Math.min(W * 0.4, 380);
+    const aspect = tamLogo.naturalHeight / tamLogo.naturalWidth;
+    const logoW = maxLogoW * t, logoH = (maxLogoW * aspect) * t, logoY = H * 0.28;
+    const padX = 16 * t, padY = 8 * t;
     
-    // Draw white background container behind logo for contrast
     fxCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    const padX = 20 * t, padY = 10 * t;
-    fxCtx.beginPath();
-    fxCtx.roundRect(
-      W / 2 - logoW / 2 - padX,
-      H * 0.28 - logoH / 2 - padY,
-      logoW + (padX * 2),
-      logoH + (padY * 2),
-      12
-    );
-    fxCtx.fill();
-
-    fxCtx.drawImage(
-      tamLogo,
-      W / 2 - logoW / 2,
-      H * 0.28 - logoH / 2,
-      logoW,
-      logoH
-    );
+    if (fxCtx.roundRect) {
+      fxCtx.beginPath(); fxCtx.roundRect(W / 2 - logoW / 2 - padX, logoY - logoH / 2 - padY, logoW + padX * 2, logoH + padY * 2, 10); fxCtx.fill();
+    } else fxCtx.fillRect(W / 2 - logoW / 2 - padX, logoY - logoH / 2 - padY, logoW + padX * 2, logoH + padY * 2);
+    
+    fxCtx.drawImage(tamLogo, W / 2 - logoW / 2, logoY - logoH / 2, logoW, logoH);
   }
 
-  // Render Title Text
   const size1 = (Math.min(H * 0.08, W * 0.055)) * (0.2 + 0.8 * t);
-  fxCtx.fillStyle = '#ffffff';
-  fxCtx.font = `600 ${size1}px Arial, sans-serif`;
-  fxCtx.fillText(TITLE_LINE1, W / 2, H * 0.50);
-  
-  fxCtx.fillStyle = FEATURED_COLOR;
-  fxCtx.font = `700 ${size1 * 1.3}px Arial, sans-serif`;
-  fxCtx.fillText(TITLE_LINE2, W / 2, H * 0.63);
-  
+  fxCtx.fillStyle = '#ffffff'; fxCtx.font = `600 ${size1}px Arial, sans-serif`; fxCtx.fillText(TITLE_LINE1, W / 2, H * 0.52);
+  fxCtx.fillStyle = FEATURED_COLOR; fxCtx.font = `700 ${size1 * 1.3}px Arial, sans-serif`; fxCtx.fillText(TITLE_LINE2, W / 2, H * 0.65);
   fxCtx.restore();
 }
 
@@ -445,15 +443,10 @@ const source = new EventSource('/api/events');
 
 source.addEventListener('sync', (e) => {
   const data = JSON.parse(e.data);
-  placed.clear();
-  slotIndex = 0;
-  baseCtx.clearRect(0, 0, W, H);
-  drawIdleOutline();
-  for (const n of data.names) {
-    if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, true);
-  }
-  counterEl.textContent = placed.size;
-  applyScene(data.sceneState);
+  placed.clear(); slotIndex = 0;
+  baseCtx.clearRect(0, 0, W, H); drawIdleOutline();
+  for (const n of data.names) if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, true);
+  counterEl.textContent = placed.size; applyScene(data.sceneState);
 });
 
 source.addEventListener('name:new', (e) => {
@@ -463,44 +456,23 @@ source.addEventListener('name:new', (e) => {
 
 source.addEventListener('name:hidden', (e) => {
   const { id } = JSON.parse(e.data);
-  placed.delete(id);
-  counterEl.textContent = placed.size;
-  rebuildSlotsAndRedraw();
+  placed.delete(id); counterEl.textContent = placed.size; rebuildSlotsAndRedraw();
 });
 
 source.addEventListener('name:reset', () => {
-  placed.clear();
-  slotIndex = 0;
-  animatingWords = [];
-  zoomAnim = null;
-  titleAnim = null;
-  dimAlpha = 0;
-  counterEl.textContent = '0';
-  baseCtx.clearRect(0, 0, W, H);
-  fxCtx.clearRect(0, 0, W, H);
-  drawIdleOutline();
+  placed.clear(); slotIndex = 0; animatingWords = []; zoomAnim = null; titleAnim = null;
+  dimAlpha = 0; counterEl.textContent = '0';
+  baseCtx.clearRect(0, 0, W, H); fxCtx.clearRect(0, 0, W, H); drawIdleOutline();
 });
 
-source.addEventListener('scene:change', (e) => {
-  applyScene(JSON.parse(e.data));
-});
+source.addEventListener('scene:change', (e) => applyScene(JSON.parse(e.data)));
 
 function applyScene(scene) {
-  if (scene.state === 'frozen') {
-    banner = { text: 'The shape is complete!', start: performance.now(), duration: 3000 };
-    ensureLoop();
-  } else if (scene.state === 'zoom' && scene.payload && scene.payload.name) {
-    const target = Array.from(placed.values()).find(
-      (w) => w.name.toLowerCase() === scene.payload.name.toLowerCase()
-    );
-    const targetSlot = target ? { x: target.x, y: target.y } : { x: W / 2, y: H / 2 };
-    const targetFontPx = target ? target.fontPx : Math.min(H * 0.78, W * 0.46) * 0.06;
-    zoomAnim = { name: scene.payload.name, targetSlot, targetFontPx, start: performance.now() };
-    ensureLoop();
-  } else if (scene.state === 'title') {
-    titleAnim = { start: performance.now() };
-    ensureLoop();
-  }
+  if (scene.state === 'frozen') { banner = { text: 'The shape is complete!', start: performance.now(), duration: 3000 }; ensureLoop(); }
+  else if (scene.state === 'zoom' && scene.payload && scene.payload.name) {
+    const target = Array.from(placed.values()).find(w => w.name.toLowerCase() === scene.payload.name.toLowerCase());
+    zoomAnim = { name: scene.payload.name, targetSlot: target ? { x: target.x, y: target.y } : { x: W / 2, y: H / 2 }, targetFontPx: target ? target.fontPx : Math.min(H * 0.78, W * 0.46) * 0.06, start: performance.now() }; ensureLoop();
+  } else if (scene.state === 'title') { titleAnim = { start: performance.now() }; ensureLoop(); }
 }
 
 resize();
