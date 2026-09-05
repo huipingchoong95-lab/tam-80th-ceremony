@@ -111,6 +111,42 @@ app.post('/api/admin/hide', (req, res) => {
   res.json({ ok: true });
 });
 
+// Permanently delete an inappropriate name
+app.post('/api/admin/delete', (req, res) => {
+  if (!checkPin(req, res)) return;
+  const { id } = req.body;
+  const index = names.findIndex((n) => n.id === id);
+  if (index === -1) return res.status(404).json({ error: 'Name not found.' });
+  
+  names.splice(index, 1);
+  persist();
+  broadcast('name:deleted', { id });
+  res.json({ ok: true });
+});
+
+// Quickly fill the shape with random placeholder names if running out of time
+app.post('/api/admin/fill-random', (req, res) => {
+  if (!checkPin(req, res)) return;
+  const count = req.body.count || 10;
+  const pool = ['Guest', 'Participant', 'Delegate', 'Member', 'Supporter', 'Visitor', 'Friend', 'Attendee'];
+  const added = [];
+
+  for (let i = 0; i < count; i++) {
+    const randomName = `${pool[Math.floor(Math.random() * pool.length)]} ${Math.floor(Math.random() * 900 + 100)}`;
+    const entry = {
+      id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      name: randomName,
+      ts: Date.now(),
+      hidden: false,
+    };
+    names.push(entry);
+    added.push(entry);
+    broadcast('name:new', entry);
+  }
+  persist();
+  res.json({ ok: true, count: added.length });
+});
+
 app.post('/api/admin/scene', (req, res) => {
   if (!checkPin(req, res)) return;
   const { state, payload } = req.body;
