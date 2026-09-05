@@ -80,7 +80,7 @@ function playBoom() {
   const bufferSize = audioCtx.sampleRate * 1.2;
   const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
   const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; // White noise
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
   
   const noise = audioCtx.createBufferSource();
   noise.buffer = buffer;
@@ -115,7 +115,6 @@ let animatingWords = [], loopRunning = false;
 let dimAlpha = 0, zoomAnim = null, titleAnim = null;
 let fireworks = [], particles = [], netNodes = [];
 
-// Initialize Network Background Nodes
 for(let i=0; i<60; i++) {
   netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
 }
@@ -201,7 +200,7 @@ function animateBg() {
   }
   requestAnimationFrame(animateBg);
 }
-requestAnimationFrame(animateBg); // Start background loop
+requestAnimationFrame(animateBg);
 
 function buildSlots() {
   const off = document.createElement('canvas'); off.width = W; off.height = H;
@@ -212,9 +211,10 @@ function buildSlots() {
   octx.fillText(SHAPE_TEXT, W / 2, H / 2);
 
   const img = octx.getImageData(0, 0, W, H).data;
-  const cellSize = Math.max(24, Math.floor(W / 40));
+  // Increased cell size for wider spacing so text items never overlap
+  const cellSize = Math.max(36, Math.floor(W / 30));
   const result = [];
-  const reservedRadius = Math.min(W, H) * 0.16;
+  const reservedRadius = Math.min(W, H) * 0.18;
 
   for (let y = cellSize / 2; y < H; y += cellSize) {
     for (let x = cellSize / 2; x < W; x += cellSize) {
@@ -232,11 +232,12 @@ function buildSlots() {
 }
 
 function getTargetFontSize(totalCount) {
-  if (totalCount <= 5) return Math.min(W * 0.038, 52);
-  if (totalCount <= 15) return Math.min(W * 0.030, 40);
-  if (totalCount <= 30) return Math.min(W * 0.024, 30);
-  if (totalCount <= 60) return Math.min(W * 0.018, 22);
-  return Math.min(W * 0.014, 16);
+  // Smooth and aggressive dynamic scaling to fit perfectly inside the shape strokes
+  if (totalCount <= 5) return Math.min(W * 0.028, 38);
+  if (totalCount <= 15) return Math.min(W * 0.022, 28);
+  if (totalCount <= 30) return Math.min(W * 0.016, 21);
+  if (totalCount <= 60) return Math.min(W * 0.012, 16);
+  return Math.min(W * 0.0095, 12);
 }
 
 function checkIsPresident(name, featured) {
@@ -258,7 +259,6 @@ function rebuildSlotsAndRedraw() {
 }
 
 function drawIdleOutline() {
-  // Deliberately no longer returning early. The shape stays as a hologram.
   baseCtx.save();
   baseCtx.font = `bold ${Math.min(H * 0.75, W * 0.45)}px Arial, sans-serif`;
   baseCtx.textAlign = 'center'; baseCtx.textBaseline = 'middle';
@@ -301,7 +301,7 @@ function assignAndDraw(id, name, featured, immediate) {
 
   const slot = slots.length === 0 ? { x: W / 2, y: H / 2 } : slots[slotIndex % slots.length];
   slotIndex++;
-  const wordObj = { id, name, x: slot.x, y: slot.y, rot: (Math.random() * 12 - 6) * (Math.PI / 180), color: pickColor(name), fontPx: getTargetFontSize(placed.size + 1), featured: false };
+  const wordObj = { id, name, x: slot.x, y: slot.y, rot: (Math.random() * 10 - 5) * (Math.PI / 180), color: pickColor(name), fontPx: getTargetFontSize(placed.size + 1), featured: false };
   placed.set(id, wordObj); counterEl.textContent = placed.size;
 
   if (immediate) stampWord(baseCtx, wordObj, 1);
@@ -425,6 +425,7 @@ source.addEventListener('sync', (e) => {
 });
 source.addEventListener('name:new', (e) => assignAndDraw(JSON.parse(e.data).id, JSON.parse(e.data).name, JSON.parse(e.data).featured, false));
 source.addEventListener('name:hidden', (e) => { placed.delete(JSON.parse(e.data).id); rebuildSlotsAndRedraw(); });
+source.addEventListener('name:deleted', (e) => { placed.delete(JSON.parse(e.data).id); rebuildSlotsAndRedraw(); });
 source.addEventListener('name:reset', () => { placed.clear(); slotIndex = 0; titleAnim = null; dimAlpha = 0; counterEl.textContent = '0'; baseCtx.clearRect(0, 0, W, H); drawIdleOutline(); });
 source.addEventListener('scene:change', (e) => {
   const scene = JSON.parse(e.data);
