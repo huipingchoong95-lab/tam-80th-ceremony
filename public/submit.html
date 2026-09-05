@@ -2,109 +2,160 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>TAM Penang — 80th anniversary</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TAM Penang 80th Anniversary — Join the Shape</title>
 <style>
-  :root {
-    --bg: #0b1420;
-    --surface: #131f2e;
-    --border: #26374d;
-    --text: #eef2f6;
-    --text-muted: #8fa0b5;
-    --accent: #f2c14e;
-    --accent-text: #3a2a06;
+  body { 
+    font-family: sans-serif; 
+    background: #040914; 
+    color: #e0f2fe; 
+    margin: 0; 
+    padding: 24px; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    min-height: 100vh; 
+    box-sizing: border-box; 
   }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    margin: 0; display: flex; align-items: center; justify-content: center;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg); color: var(--text); padding: 24px;
+  .card { 
+    background: rgba(10, 20, 35, 0.9); 
+    border: 1px solid rgba(0, 255, 204, 0.3); 
+    padding: 36px 24px; 
+    border-radius: 20px; 
+    width: 100%; 
+    max-width: 400px; 
+    box-shadow: 0 8px 32px rgba(0, 255, 204, 0.15); 
+    text-align: center; 
+    backdrop-filter: blur(12px);
   }
-  .card { width: 100%; max-width: 380px; text-align: center; }
-  .mark {
-    width: 56px; height: 56px; border: 2px solid var(--accent); border-radius: 50%;
-    margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;
-    font-size: 20px; font-weight: 600; color: var(--accent);
+  .logo-text { 
+    font-size: 13px; 
+    font-weight: 700; 
+    color: #00ffcc; 
+    letter-spacing: 1.5px; 
+    text-transform: uppercase; 
+    margin-bottom: 8px; 
   }
-  h1 { font-size: 19px; font-weight: 600; margin: 0 0 6px; }
-  p.sub { color: var(--text-muted); margin: 0 0 28px; font-size: 14px; line-height: 1.5; }
-  input[type=text] {
-    width: 100%; font-size: 17px; padding: 14px 16px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 10px; color: var(--text);
-    margin-bottom: 14px; text-align: center;
+  h1 { 
+    color: #ffffff; 
+    font-size: 24px; 
+    margin: 0 0 8px 0; 
   }
-  input[type=text]::placeholder { color: var(--text-muted); }
-  input[type=text]:focus { outline: none; border-color: var(--accent); }
-  button {
-    width: 100%; font-size: 16px; font-weight: 600; padding: 14px; border: none; border-radius: 10px;
-    background: var(--accent); color: var(--accent-text); cursor: pointer;
+  p { 
+    color: #94a3b8; 
+    font-size: 14px; 
+    margin-bottom: 24px; 
+    line-height: 1.5; 
   }
-  button:disabled { background: var(--border); color: var(--text-muted); }
-  .msg { margin-top: 14px; font-size: 13px; min-height: 18px; }
-  .msg.error { color: #f28b82; }
-  .done { display: none; }
-  .done.show { display: block; }
-  .form.hide { display: none; }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  input { 
+    width: 100%; 
+    padding: 16px; 
+    border-radius: 12px; 
+    border: 1px solid rgba(0, 255, 204, 0.4); 
+    background: #020617; 
+    color: #fff; 
+    font-size: 16px; 
+    box-sizing: border-box; 
+    outline: none; 
+    text-align: center; 
+    transition: 0.2s;
+  }
+  input:focus { 
+    border-color: #38bdf8; 
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.3); 
+  }
+  button { 
+    width: 100%; 
+    padding: 16px; 
+    border-radius: 12px; 
+    border: none; 
+    background: #00ffcc; 
+    color: #040914; 
+    font-size: 16px; 
+    font-weight: 700; 
+    cursor: pointer; 
+    transition: 0.2s; 
+    box-shadow: 0 4px 16px rgba(0, 255, 204, 0.3);
+  }
+  button:hover { 
+    background: #38bdf8; 
+    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.4);
+  }
+  button:active {
+    transform: scale(0.98);
+  }
+  #message { 
+    margin-top: 16px; 
+    font-size: 14px; 
+    font-weight: 600; 
+    min-height: 24px; 
+    transition: 0.3s;
+  }
+  .success { color: #00ffcc; }
+  .error { color: #f43f5e; }
 </style>
 </head>
 <body>
+
   <div class="card">
-    <div class="form" id="form">
-      <div class="mark">80</div>
-      <h1>TAM Penang, 80th anniversary</h1>
-      <p class="sub">Add your name to the wall — watch it appear on the big screen.</p>
-      <input type="text" id="nameInput" maxlength="40" placeholder="Your name" autocomplete="name">
-      <button id="submitBtn">Add my name</button>
-      <div class="msg" id="msg"></div>
-    </div>
-    <div class="done" id="done">
-      <div class="mark">80</div>
-      <h1>You're on the wall</h1>
-      <p class="sub">Look up at the big screen to find your name.</p>
-    </div>
+    <div class="logo-text">TAM Penang 80th Anniversary</div>
+    <h1>Join the Network</h1>
+    <p>Enter your name or handle to anchor your node into the live display shape.</p>
+    
+    <form id="submit-form" onsubmit="submitName(event)">
+      <input type="text" id="name-input" placeholder="Your Name or Nickname" maxlength="40" autocomplete="off" required>
+      <button type="submit" id="submit-btn">Submit Name</button>
+    </form>
+    
+    <div id="message"></div>
   </div>
 
 <script>
-  const form = document.getElementById('form');
-  const done = document.getElementById('done');
-  const input = document.getElementById('nameInput');
-  const btn = document.getElementById('submitBtn');
-  const msg = document.getElementById('msg');
+async function submitName(event) {
+  event.preventDefault();
+  const input = document.getElementById('name-input');
+  const btn = document.getElementById('submit-btn');
+  const msg = document.getElementById('message');
+  const name = input.value.trim();
 
-  btn.addEventListener('click', submitName);
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitName(); });
+  if (!name) return;
 
-  async function submitName() {
-    const name = input.value.trim();
-    if (!name) {
-      msg.textContent = 'Enter your name first.';
-      msg.className = 'msg error';
-      return;
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  msg.textContent = 'Transmitting node...';
+  msg.className = '';
+
+  try {
+    const res = await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    
+    const data = await res.json();
+    
+    if (res.ok) {
+      msg.textContent = 'Successfully joined the network!';
+      msg.className = 'success';
+      input.value = '';
+      setTimeout(() => { msg.textContent = ''; }, 4000);
+    } else {
+      msg.textContent = data.error || 'Submission failed. Try again.';
+      msg.className = 'error';
     }
-    btn.disabled = true;
-    msg.textContent = '';
-    try {
-      const res = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        msg.textContent = data.error || 'Something went wrong — try again.';
-        msg.className = 'msg error';
-        btn.disabled = false;
-        return;
-      }
-      form.classList.add('hide');
-      done.classList.add('show');
-    } catch (err) {
-      msg.textContent = 'Connection issue — try again.';
-      msg.className = 'msg error';
-      btn.disabled = false;
-    }
+  } catch (err) {
+    msg.textContent = 'Network error. Please check your connection.';
+    msg.className = 'error';
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = '1';
   }
+}
 </script>
 </body>
 </html>
