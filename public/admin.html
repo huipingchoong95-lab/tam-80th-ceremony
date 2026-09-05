@@ -2,204 +2,116 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ceremony admin — TAM Penang 80th</title>
+<title>TAM 80th — Admin Control Panel</title>
 <style>
-  :root {
-    --bg: #0b1420;
-    --surface: #131f2e;
-    --surface-2: #1a2836;
-    --border: #26374d;
-    --text: #eef2f6;
-    --text-muted: #8fa0b5;
-    --accent: #f2c14e;
-    --accent-text: #3a2a06;
-    --danger: #d9564c;
-  }
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg); color: var(--text); margin: 0; padding: 24px;
-  }
-  h1 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
-  .pin-gate { max-width: 320px; margin: 60px auto; text-align: center; }
-  input {
-    font-size: 16px; padding: 12px; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--surface); color: var(--text); width: 100%; box-sizing: border-box; margin-bottom: 10px;
-  }
-  input:focus { outline: none; border-color: var(--accent); }
-  button {
-    font-size: 14px; font-weight: 600; padding: 11px 16px; border-radius: 8px; border: none;
-    background: var(--accent); color: var(--accent-text); cursor: pointer; margin: 4px 8px 4px 0;
-  }
-  button.secondary { background: var(--surface-2); color: var(--text); }
-  button.danger { background: var(--danger); color: #fff; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  .panel { display: none; max-width: 480px; margin: 0 auto; }
-  .panel.show { display: block; }
-  .row { margin-bottom: 22px; }
-  .count { font-size: 34px; font-weight: 700; }
-  .names { max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; }
-  .name-item {
-    display: flex; justify-content: space-between; align-items: center; padding: 9px 14px;
-    border-bottom: 1px solid var(--border); font-size: 14px;
-  }
-  .name-item:last-child { border-bottom: none; }
-  .name-item button { margin: 0; padding: 5px 10px; font-size: 12px; }
-  .status { font-size: 13px; color: var(--text-muted); margin-top: 8px; min-height: 18px; }
+  body { font-family: sans-serif; background: #040914; color: #e0f2fe; margin: 0; padding: 24px; }
+  h1 { color: #00ffcc; font-size: 24px; margin-bottom: 8px; }
+  .card { background: rgba(10, 20, 35, 0.8); border: 1px solid rgba(0, 255, 204, 0.3); padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+  input, button { padding: 10px 16px; border-radius: 8px; border: 1px solid rgba(0, 255, 204, 0.4); font-size: 14px; }
+  input { background: #020617; color: #fff; }
+  button { background: #00ffcc; color: #040914; font-weight: 700; cursor: pointer; transition: 0.2s; }
+  button:hover { background: #38bdf8; }
+  button.danger { background: #f43f5e; color: #fff; border: none; }
+  button.danger:hover { background: #e11d48; }
+  .name-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  #name-list { max-height: 350px; overflow-y: auto; margin-top: 12px; }
+  .controls-grid { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
 </style>
 </head>
 <body>
-  <div class="pin-gate" id="pinGate">
-    <h1>Ceremony admin</h1>
-    <input type="password" id="pinInput" placeholder="Enter PIN">
-    <button id="pinBtn">Unlock</button>
-    <div class="status" id="pinStatus"></div>
+
+  <h1>TAM Penang 80th Anniversary — Control Panel</h1>
+  
+  <div class="card" id="login-card">
+    <h3>Enter Admin PIN</h3>
+    <input type="password" id="pin-input" placeholder="PIN (Default: 2026)">
+    <button onclick="loadNames()">Login</button>
   </div>
 
-  <div class="panel" id="panel">
-    <h1>Ceremony admin</h1>
-
-    <div class="row">
-      <div class="count" id="count">0</div>
-      <div class="status">names on screen</div>
+  <div class="card" id="dashboard" style="display:none;">
+    <h3>Emcee Quick Controls</h3>
+    <div class="controls-grid">
+      <button onclick="triggerScene('collecting')">State: Collecting Names</button>
+      <button onclick="triggerScene('title')">Trigger Title & Fireworks</button>
+      <button onclick="fillRandom(10)">+10 Random Placeholders</button>
+      <button class="danger" onclick="resetAll()">Reset All Names</button>
     </div>
 
-    <div class="row">
-      <button id="freezeBtn">Freeze cloud ("shape complete!")</button>
-    </div>
-
-    <div class="row">
-      <input type="text" id="presidentName" placeholder="Ts. President's full name" maxlength="40">
-      <button id="zoomBtn">Zoom president's name</button>
-    </div>
-
-    <div class="row">
-      <button id="titleBtn">Show final title</button>
-    </div>
-
-    <div class="row">
-      <button class="danger" id="resetBtn">Reset everything</button>
-    </div>
-
-    <div class="status" id="actionStatus"></div>
-
-    <div class="row">
-      <h1>Submitted names</h1>
-      <div class="names" id="namesList"></div>
-    </div>
+    <h3 style="margin-top: 24px;">Live Participant Submissions (<span id="count">0</span>)</h3>
+    <div id="name-list"></div>
   </div>
 
 <script>
-  let PIN = '';
-  const pinGate = document.getElementById('pinGate');
-  const panel = document.getElementById('panel');
-  const pinInput = document.getElementById('pinInput');
-  const pinStatus = document.getElementById('pinStatus');
-  const countEl = document.getElementById('count');
-  const namesList = document.getElementById('namesList');
-  const actionStatus = document.getElementById('actionStatus');
+let currentPin = '';
 
-  document.getElementById('pinBtn').addEventListener('click', unlock);
-  pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') unlock(); });
+async function loadNames() {
+  currentPin = document.getElementById('pin-input').value;
+  const res = await fetch(`/api/admin/names?pin=${currentPin}`);
+  if (!res.ok) { alert('Incorrect PIN'); return; }
+  
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  fetchNamesLoop();
+}
 
-  async function unlock() {
-    PIN = pinInput.value.trim();
-    if (!PIN) return;
-    pinStatus.textContent = 'Checking…';
-    try {
-      const res = await fetch('/api/admin/names?pin=' + encodeURIComponent(PIN));
-      if (!res.ok) {
-        pinStatus.textContent = 'Incorrect PIN.';
-        return;
-      }
-      pinGate.style.display = 'none';
-      panel.classList.add('show');
-      connect();
-    } catch (err) {
-      pinStatus.textContent = 'Connection issue — try again.';
-    }
+async function fetchNamesLoop() {
+  const res = await fetch(`/api/admin/names?pin=${currentPin}`);
+  if (res.ok) {
+    const data = await res.json();
+    renderList(data.names);
   }
+  setTimeout(fetchNamesLoop, 3000); // Refresh list every 3s
+}
 
-  let allNames = [];
+function renderList(names) {
+  const listEl = document.getElementById('name-list');
+  document.getElementById('count').textContent = names.length;
+  if (names.length === 0) { listEl.innerHTML = '<p style="color: #64748b;">No submissions yet.</p>'; return; }
+  
+  listEl.innerHTML = names.map(n => `
+    <div class="name-row">
+      <span><strong>${n.name}</strong> ${n.featured ? '⭐ [VIP]' : ''}</span>
+      <button class="danger" onclick="deleteName('${n.id}')">Delete</button>
+    </div>
+  `).join('');
+}
 
-  function connect() {
-    const source = new EventSource('/api/events');
-    source.addEventListener('sync', (e) => {
-      const data = JSON.parse(e.data);
-      allNames = data.names;
-      render();
-    });
-    source.addEventListener('name:new', (e) => {
-      allNames.push(JSON.parse(e.data));
-      render();
-    });
-    source.addEventListener('name:hidden', (e) => {
-      const { id } = JSON.parse(e.data);
-      const n = allNames.find((x) => x.id === id);
-      if (n) n.hidden = true;
-      render();
-    });
-    source.addEventListener('name:reset', () => {
-      allNames = [];
-      render();
-    });
-  }
-
-  function render() {
-    const visible = allNames.filter((n) => !n.hidden);
-    countEl.textContent = visible.length;
-    namesList.innerHTML = '';
-    for (const n of [...allNames].reverse()) {
-      const row = document.createElement('div');
-      row.className = 'name-item';
-      const label = document.createElement('span');
-      label.textContent = n.name + (n.hidden ? ' (hidden)' : '') + (n.featured ? ' \u2605' : '');
-      row.appendChild(label);
-      if (!n.hidden) {
-        const btn = document.createElement('button');
-        btn.className = 'secondary';
-        btn.textContent = 'Hide';
-        btn.addEventListener('click', () => hideName(n.id));
-        row.appendChild(btn);
-      }
-      namesList.appendChild(row);
-    }
-  }
-
-  async function callScene(state, payload) {
-    actionStatus.textContent = 'Sending…';
-    try {
-      const res = await fetch('/api/admin/scene', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: PIN, state, payload }),
-      });
-      const data = await res.json();
-      actionStatus.textContent = res.ok ? 'Sent.' : (data.error || 'Failed.');
-    } catch (err) {
-      actionStatus.textContent = 'Connection issue — try again.';
-    }
-  }
-
-  async function hideName(id) {
-    await fetch('/api/admin/hide', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: PIN, id }),
-    });
-  }
-
-  document.getElementById('freezeBtn').addEventListener('click', () => callScene('frozen'));
-  document.getElementById('zoomBtn').addEventListener('click', () => {
-    const name = document.getElementById('presidentName').value.trim();
-    if (!name) { actionStatus.textContent = "Enter the president's name first."; return; }
-    callScene('zoom', { name });
+async function deleteName(id) {
+  if (!confirm('Permanently delete this name?')) return;
+  await fetch('/api/admin/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: currentPin, id })
   });
-  document.getElementById('titleBtn').addEventListener('click', () => callScene('title'));
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    if (confirm('Reset all names and scenes? This cannot be undone.')) callScene('reset');
+  loadNames();
+}
+
+async function fillRandom(count) {
+  await fetch('/api/admin/fill-random', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: currentPin, count })
   });
+  loadNames();
+}
+
+async function triggerScene(state) {
+  await fetch('/api/admin/scene', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: currentPin, state })
+  });
+}
+
+async function resetAll() {
+  if (!confirm('WARNING: This will wipe all current names! Proceed?')) return;
+  await fetch('/api/admin/scene', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: currentPin, state: 'reset' })
+  });
+  loadNames();
+}
 </script>
 </body>
 </html>
