@@ -34,6 +34,13 @@
     position: absolute; bottom: 16px; left: 24px; z-index: 10;
     color: rgba(0, 255, 204, 0.5); font-size: 12px;
   }
+
+  #watermark {
+    position: absolute; bottom: 16px; right: 28px; z-index: 10;
+    color: rgba(0, 255, 204, 0.45); font-size: 13px; font-weight: 500;
+    letter-spacing: 0.5px; pointer-events: none;
+    text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+  }
 </style>
 </head>
 <body>
@@ -53,6 +60,7 @@
   </div>
   
   <div id="audio-hint">Click or tap screen once to enable audio context</div>
+  <div id="watermark">Designed & Developed by Ts. Choong Hui Ping</div>
 
 <script>
 const PALETTE = ['#ffffff', '#bae6fd', '#7dd3fc', '#00ffcc'];
@@ -182,7 +190,7 @@ window.addEventListener('resize', resize);
 
 function animateBg() {
   bgCtx.clearRect(0, 0, W, H);
-  bgCtx.lineWidth = 2; // Thicker lines for projector visibility
+  bgCtx.lineWidth = 2; // Thicker lines for big screen clarity
   
   for(let i=0; i<netNodes.length; i++) {
     let n = netNodes[i];
@@ -192,19 +200,19 @@ function animateBg() {
     
     let px = n.x * W, py = n.y * H;
     
-    // Brighter glowing node dots
+    // Glowing node dots
     bgCtx.fillStyle = '#00ffcc';
     bgCtx.shadowColor = 'rgba(0, 255, 204, 0.8)';
     bgCtx.shadowBlur = 6;
     bgCtx.beginPath(); bgCtx.arc(px, py, 3, 0, Math.PI*2); bgCtx.fill();
-    bgCtx.shadowBlur = 0; // Reset shadow for performance/lines
+    bgCtx.shadowBlur = 0;
     
     for(let j=i+1; j<netNodes.length; j++) {
       let n2 = netNodes[j];
       let p2x = n2.x * W, p2y = n2.y * H;
       let dist = Math.hypot(px - p2x, py - p2y);
-      if(dist < 180) { // Slightly increased connection distance
-        bgCtx.strokeStyle = `rgba(0, 255, 204, ${0.4 * (1 - dist/180)})`; // Higher opacity (0.4 max)
+      if(dist < 180) {
+        bgCtx.strokeStyle = `rgba(0, 255, 204, ${0.4 * (1 - dist/180)})`;
         bgCtx.beginPath(); bgCtx.moveTo(px, py); bgCtx.lineTo(p2x, p2y); bgCtx.stroke();
       }
     }
