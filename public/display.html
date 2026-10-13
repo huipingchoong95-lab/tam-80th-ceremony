@@ -68,7 +68,7 @@ const FEATURED_COLOR = '#f2c14e';
 const SHAPE_TEXT = '80';
 const TITLE_LINE1 = '80th Anniversary';
 const TITLE_LINE2 = 'TAM Penang';
-const FIREWORK_TEXT = '80 TAM 2027';
+const FIREWORK_WORDS = ['80', 'TAM', '2027'];
 
 const POPIN_MS = 450;
 const ZOOM_IN_MS = 900;
@@ -128,32 +128,38 @@ let slots = [], placed = new Map(), slotIndex = 0;
 let animatingWords = [], loopRunning = false;
 let dimAlpha = 0, zoomAnim = null, titleAnim = null;
 let fireworks = [], particles = [], netNodes = [];
-let shapePoints = [], fireworkTimer = 0;
+let shapePointsMap = {}, fireworkTimer = 0;
 
 for(let i=0; i<65; i++) {
   netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
 }
 
-// Sample coordinates from text to form the firework shape
+// Generate separate coordinate maps for each word ('80', 'TAM', '2027')
 function generateShapePoints() {
+  shapePointsMap = {};
   const off = document.createElement('canvas');
   off.width = W; off.height = H;
   const octx = off.getContext('2d');
-  const fontPx = Math.min(W * 0.08, 65);
-  octx.font = `bold ${fontPx}px Arial, sans-serif`;
-  octx.textAlign = 'center'; octx.textBaseline = 'middle';
-  octx.fillStyle = '#fff';
-  octx.fillText(FIREWORK_TEXT, W / 2, H * 0.42);
+  
+  for (const word of FIREWORK_WORDS) {
+    octx.clearRect(0, 0, W, H);
+    const fontPx = Math.min(W * 0.15, 110);
+    octx.font = `bold ${fontPx}px Arial, sans-serif`;
+    octx.textAlign = 'center'; octx.textBaseline = 'middle';
+    octx.fillStyle = '#fff';
+    octx.fillText(word, W / 2, H * 0.42);
 
-  const img = octx.getImageData(0, 0, W, H).data;
-  shapePoints = [];
-  const step = 4; // Sampling density
-  for (let y = 0; y < H; y += step) {
-    for (let x = 0; x < W; x += step) {
-      if (img[(y * W + x) * 4 + 3] > 128) {
-        shapePoints.push({ x, y });
+    const img = octx.getImageData(0, 0, W, H).data;
+    const points = [];
+    const step = 3;
+    for (let y = 0; y < H; y += step) {
+      for (let x = 0; x < W; x += step) {
+        if (img[(y * W + x) * 4 + 3] > 128) {
+          points.push({ x, y });
+        }
       }
     }
+    shapePointsMap[word] = points;
   }
 }
 
@@ -164,6 +170,8 @@ class Firework {
     this.targetY = H * 0.42;
     this.speed = Math.random() * 3 + 8;
     this.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+    // Randomly assign one of the 3 words to this firework
+    this.word = FIREWORK_WORDS[Math.floor(Math.random() * FIREWORK_WORDS.length)];
     this.alive = true;
   }
   update() {
@@ -175,11 +183,11 @@ class Firework {
   }
   explode() {
     playBoom();
-    if (shapePoints.length === 0) generateShapePoints();
-    if (shapePoints.length === 0) return;
+    const points = shapePointsMap[this.word];
+    if (!points || points.length === 0) return;
 
-    const count = Math.min(shapePoints.length, 300);
-    const shuffled = [...shapePoints].sort(() => Math.random() - 0.5);
+    const count = Math.min(points.length, 250);
+    const shuffled = [...points].sort(() => Math.random() - 0.5);
 
     for (let i = 0; i < count; i++) {
       const target = shuffled[i % shuffled.length];
@@ -221,7 +229,7 @@ class ShapeParticle {
         this.phase = 'forming';
       }
     } else {
-      // Smoothly glide towards the letter coordinate targets
+      // Smoothly glide towards the individual word coordinate targets
       this.x += (this.targetX - this.x) * 0.1;
       this.y += (this.targetY - this.y) * 0.1;
       
