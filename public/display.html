@@ -128,34 +128,36 @@ let slots = [], placed = new Map(), slotIndex = 0;
 let animatingWords = [], loopRunning = false;
 let dimAlpha = 0, zoomAnim = null, titleAnim = null;
 let fireworks = [], particles = [], netNodes = [];
-let shapePointsMap = {}, fireworkTimer = 0;
+let shapePointsMap = {}, sequenceIndex = 0, fireworkTimer = 0;
 
 for(let i=0; i<65; i++) {
   netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
 }
 
-// Generate separate coordinate maps for each word ('80', 'TAM', '2027')
+// Generate localized word offset coordinates centered around (0,0)
 function generateShapePoints() {
   shapePointsMap = {};
+  const boxW = 400, boxH = 200;
   const off = document.createElement('canvas');
-  off.width = W; off.height = H;
+  off.width = boxW; off.height = boxH;
   const octx = off.getContext('2d');
   
   for (const word of FIREWORK_WORDS) {
-    octx.clearRect(0, 0, W, H);
-    const fontPx = Math.min(W * 0.15, 110);
+    octx.clearRect(0, 0, boxW, boxH);
+    const fontPx = Math.min(W * 0.12, 85);
     octx.font = `bold ${fontPx}px Arial, sans-serif`;
     octx.textAlign = 'center'; octx.textBaseline = 'middle';
     octx.fillStyle = '#fff';
-    octx.fillText(word, W / 2, H * 0.42);
+    octx.fillText(word, boxW / 2, boxH / 2);
 
-    const img = octx.getImageData(0, 0, W, H).data;
+    const img = octx.getImageData(0, 0, boxW, boxH).data;
     const points = [];
     const step = 3;
-    for (let y = 0; y < H; y += step) {
-      for (let x = 0; x < W; x += step) {
-        if (img[(y * W + x) * 4 + 3] > 128) {
-          points.push({ x, y });
+    for (let y = 0; y < boxH; y += step) {
+      for (let x = 0; x < boxW; x += step) {
+        if (img[(y * boxW + x) * 4 + 3] > 128) {
+          // Store offsets relative to origin (0, 0)
+          points.push({ dx: x - boxW / 2, dy: y - boxH / 2 });
         }
       }
     }
@@ -164,14 +166,14 @@ function generateShapePoints() {
 }
 
 class Firework {
-  constructor() {
-    this.x = Math.random() * (W * 0.5) + (W * 0.25);
+  constructor(word) {
+    // Random launch and target height across screen
+    this.x = Math.random() * (W * 0.65) + (W * 0.175);
     this.y = H;
-    this.targetY = H * 0.42;
+    this.targetY = Math.random() * (H * 0.35) + (H * 0.15);
     this.speed = Math.random() * 3 + 8;
     this.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
-    // Randomly assign one of the 3 words to this firework
-    this.word = FIREWORK_WORDS[Math.floor(Math.random() * FIREWORK_WORDS.length)];
+    this.word = word;
     this.alive = true;
   }
   update() {
@@ -186,12 +188,15 @@ class Firework {
     const points = shapePointsMap[this.word];
     if (!points || points.length === 0) return;
 
-    const count = Math.min(points.length, 250);
+    const count = Math.min(points.length, 260);
     const shuffled = [...points].sort(() => Math.random() - 0.5);
 
+    // Form word relative to this exact explosion location (this.x, this.targetY)
     for (let i = 0; i < count; i++) {
-      const target = shuffled[i % shuffled.length];
-      particles.push(new ShapeParticle(this.x, this.targetY, target.x, target.y, this.color));
+      const pt = shuffled[i % shuffled.length];
+      const targetX = this.x + pt.dx;
+      const targetY = this.targetY + pt.dy;
+      particles.push(new ShapeParticle(this.x, this.targetY, targetX, targetY, this.color));
     }
   }
   draw() {
@@ -207,15 +212,15 @@ class ShapeParticle {
     this.targetX = targetX;
     this.targetY = targetY;
     
-    // Initial explosion burst velocity
+    // Initial radial explosion burst velocity
     const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 8 + 2;
+    const speed = Math.random() * 7 + 2;
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
     
     this.alpha = 1;
     this.color = color;
-    this.phase = 'burst'; // 'burst' then 'forming'
+    this.phase = 'burst';
     this.timer = 0;
   }
   update() {
@@ -223,17 +228,17 @@ class ShapeParticle {
     if (this.phase === 'burst') {
       this.x += this.vx;
       this.y += this.vy;
-      this.vx *= 0.90;
-      this.vy *= 0.90;
-      if (this.timer > 20) {
+      this.vx *= 0.88;
+      this.vy *= 0.88;
+      if (this.timer > 18) {
         this.phase = 'forming';
       }
     } else {
-      // Smoothly glide towards the individual word coordinate targets
-      this.x += (this.targetX - this.x) * 0.1;
-      this.y += (this.targetY - this.y) * 0.1;
+      // Smoothly lock into local word offsets at explosion spot
+      this.x += (this.targetX - this.x) * 0.12;
+      this.y += (this.targetY - this.y) * 0.12;
       
-      if (this.timer > 120) {
+      if (this.timer > 110) {
         this.alpha -= 0.025;
       }
     }
@@ -467,16 +472,19 @@ function loop(now) {
     const elapsed = now - titleAnim.start;
     dimAlpha = Math.max(dimAlpha, 0.85);
     
-    // Periodically launch repeating shape-forming fireworks
+    // Launch fireworks strictly in sequence: "80" -> "TAM" -> "2027"
     fireworkTimer++;
-    if (fireworkTimer % 70 === 0) {
-      fireworks.push(new Firework());
+    if (fireworkTimer % 75 === 0) {
+      const currentWord = FIREWORK_WORDS[sequenceIndex % FIREWORK_WORDS.length];
+      fireworks.push(new Firework(currentWord));
+      sequenceIndex++;
     }
 
     drawTitle(easeOutBack(Math.min(1, elapsed / TITLE_IN_MS)));
     stillActive = true;
   } else {
     fireworkTimer = 0;
+    sequenceIndex = 0;
   }
 
   for (let i = fireworks.length - 1; i >= 0; i--) {
