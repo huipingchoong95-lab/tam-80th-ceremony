@@ -127,18 +127,41 @@ let W = 0, H = 0, DPR = 1;
 let slots = [], placed = new Map(), slotIndex = 0;
 let animatingWords = [], loopRunning = false;
 let dimAlpha = 0, zoomAnim = null, titleAnim = null;
-let fireworks = [], particles = [], activeTextFlashes = [], netNodes = [];
-let fireworkTimer = 0;
+let fireworks = [], particles = [], netNodes = [];
+let shapePoints = [], fireworkTimer = 0;
 
 for(let i=0; i<65; i++) {
   netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
 }
 
+// Sample coordinates from text to form the firework shape
+function generateShapePoints() {
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const octx = off.getContext('2d');
+  const fontPx = Math.min(W * 0.08, 65);
+  octx.font = `bold ${fontPx}px Arial, sans-serif`;
+  octx.textAlign = 'center'; octx.textBaseline = 'middle';
+  octx.fillStyle = '#fff';
+  octx.fillText(FIREWORK_TEXT, W / 2, H * 0.42);
+
+  const img = octx.getImageData(0, 0, W, H).data;
+  shapePoints = [];
+  const step = 4; // Sampling density
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      if (img[(y * W + x) * 4 + 3] > 128) {
+        shapePoints.push({ x, y });
+      }
+    }
+  }
+}
+
 class Firework {
   constructor() {
-    this.x = Math.random() * (W * 0.6) + (W * 0.2);
+    this.x = Math.random() * (W * 0.5) + (W * 0.25);
     this.y = H;
-    this.targetY = Math.random() * (H * 0.25) + (H * 0.25);
+    this.targetY = H * 0.42;
     this.speed = Math.random() * 3 + 8;
     this.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
     this.alive = true;
@@ -152,20 +175,16 @@ class Firework {
   }
   explode() {
     playBoom();
-    // 1. Standard radial explosion sparks
-    for (let i = 0; i < 75; i++) {
-      particles.push(new Particle(this.x, this.targetY, this.color));
+    if (shapePoints.length === 0) generateShapePoints();
+    if (shapePoints.length === 0) return;
+
+    const count = Math.min(shapePoints.length, 300);
+    const shuffled = [...shapePoints].sort(() => Math.random() - 0.5);
+
+    for (let i = 0; i < count; i++) {
+      const target = shuffled[i % shuffled.length];
+      particles.push(new ShapeParticle(this.x, this.targetY, target.x, target.y, this.color));
     }
-    // 2. Instantly show the wording at explosion point
-    activeTextFlashes.push({
-      x: this.x,
-      y: this.targetY,
-      text: FIREWORK_TEXT,
-      color: this.color,
-      alpha: 1,
-      scale: 0.2,
-      timer: 0
-    });
   }
   draw() {
     fxCtx.fillStyle = this.color;
@@ -173,28 +192,54 @@ class Firework {
   }
 }
 
-class Particle {
-  constructor(x, y, color) {
-    this.x = x; this.y = y;
+class ShapeParticle {
+  constructor(startX, startY, targetX, targetY, color) {
+    this.x = startX;
+    this.y = startY;
+    this.targetX = targetX;
+    this.targetY = targetY;
+    
+    // Initial explosion burst velocity
     const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 7 + 2;
+    const speed = Math.random() * 8 + 2;
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
+    
     this.alpha = 1;
-    this.decay = Math.random() * 0.02 + 0.015;
     this.color = color;
+    this.phase = 'burst'; // 'burst' then 'forming'
+    this.timer = 0;
   }
   update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.vy += 0.08; // gravity
-    this.alpha -= this.decay;
+    this.timer++;
+    if (this.phase === 'burst') {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vx *= 0.90;
+      this.vy *= 0.90;
+      if (this.timer > 20) {
+        this.phase = 'forming';
+      }
+    } else {
+      // Smoothly glide towards the letter coordinate targets
+      this.x += (this.targetX - this.x) * 0.1;
+      this.y += (this.targetY - this.y) * 0.1;
+      
+      if (this.timer > 120) {
+        this.alpha -= 0.025;
+      }
+    }
   }
   draw() {
+    if (this.alpha <= 0) return;
     fxCtx.save();
     fxCtx.globalAlpha = Math.max(0, this.alpha);
     fxCtx.fillStyle = this.color;
-    fxCtx.beginPath(); fxCtx.arc(this.x, this.y, 2.5, 0, Math.PI * 2); fxCtx.fill();
+    fxCtx.shadowColor = this.color;
+    fxCtx.shadowBlur = 8;
+    fxCtx.beginPath();
+    fxCtx.arc(this.x, this.y, 2.2, 0, Math.PI * 2);
+    fxCtx.fill();
     fxCtx.restore();
   }
 }
@@ -209,6 +254,7 @@ function resize() {
     c.style.width = W + 'px'; c.style.height = H + 'px';
     c.getContext('2d').setTransform(DPR, 0, 0, DPR, 0, 0);
   }
+  generateShapePoints();
   rebuildSlotsAndRedraw();
 }
 window.addEventListener('resize', resize);
@@ -413,9 +459,9 @@ function loop(now) {
     const elapsed = now - titleAnim.start;
     dimAlpha = Math.max(dimAlpha, 0.85);
     
-    // Periodically launch a repeating firework sequence
+    // Periodically launch repeating shape-forming fireworks
     fireworkTimer++;
-    if (fireworkTimer % 65 === 0) {
+    if (fireworkTimer % 70 === 0) {
       fireworks.push(new Firework());
     }
 
@@ -434,34 +480,7 @@ function loop(now) {
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
 
-  // Render active text flashes upon explosion
-  for (let i = activeTextFlashes.length - 1; i >= 0; i--) {
-    const tf = activeTextFlashes[i];
-    tf.timer++;
-    tf.scale = Math.min(1, tf.scale + 0.1);
-    if (tf.timer > 75) {
-      tf.alpha -= 0.03;
-    }
-    if (tf.alpha <= 0) {
-      activeTextFlashes.splice(i, 1);
-      continue;
-    }
-    fxCtx.save();
-    fxCtx.globalAlpha = Math.max(0, tf.alpha);
-    fxCtx.translate(tf.x, tf.y);
-    fxCtx.scale(tf.scale, tf.scale);
-    fxCtx.font = `800 ${Math.min(W * 0.045, 42)}px Arial, sans-serif`;
-    fxCtx.textAlign = 'center';
-    fxCtx.textBaseline = 'middle';
-    fxCtx.fillStyle = tf.color;
-    fxCtx.shadowColor = tf.color;
-    fxCtx.shadowBlur = 25;
-    fxCtx.fillText(tf.text, 0, 0);
-    fxCtx.restore();
-    stillActive = true;
-  }
-
-  if (stillActive || fireworks.length > 0 || particles.length > 0 || activeTextFlashes.length > 0) requestAnimationFrame(loop);
+  if (stillActive || fireworks.length > 0 || particles.length > 0) requestAnimationFrame(loop);
   else loopRunning = false;
 }
 
@@ -529,7 +548,6 @@ source.addEventListener('scene:change', (e) => {
     fxCtx.clearRect(0, 0, W, H);
     fireworks = [];
     particles = [];
-    activeTextFlashes = [];
   } else if (scene.state === 'zoom') { 
     zoomAnim = { name: scene.payload.name, targetSlot: { x: W / 2, y: H / 2 }, targetFontPx: 80, start: performance.now() }; 
     ensureLoop(); 
