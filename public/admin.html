@@ -3,167 +3,305 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TAM 80th — Admin Control Panel</title>
+<title>TAM Penang 80th Anniversary — Admin Control Panel</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: sans-serif; background: #040914; color: #e0f2fe; margin: 0; padding: 16px; }
-  h1 { color: #00ffcc; font-size: 20px; margin-bottom: 16px; line-height: 1.3; }
-  
-  .card { background: rgba(10, 20, 35, 0.8); border: 1px solid rgba(0, 255, 204, 0.3); padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 4px 24px rgba(0, 255, 204, 0.1); }
-  
-  input, button { width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(0, 255, 204, 0.4); font-size: 14px; font-weight: 600; }
-  input { background: #020617; color: #fff; margin-bottom: 10px; }
-  
-  .flex-row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .flex-row input { flex: 1; min-width: 180px; margin-bottom: 0; }
-  .flex-row button { width: auto; min-width: 120px; }
+  html, body { 
+    margin: 0; padding: 0; min-height: 100%; 
+    background: #040914; overflow-y: auto; 
+    font-family: sans-serif; color: #e0f2fe; 
+  }
+  canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 1; }
 
-  button { background: #00ffcc; color: #040914; cursor: pointer; transition: 0.2s; }
-  button:hover { background: #38bdf8; }
-  button.danger { background: #f43f5e; color: #fff; border: none; }
-  button.danger:hover { background: #e11d48; }
-  button.secondary { background: rgba(0, 255, 204, 0.1); color: #00ffcc; border: 1px solid rgba(0, 255, 204, 0.4); }
-  button.secondary:hover { background: rgba(0, 255, 204, 0.2); }
-  
-  .section-title { font-size: 14px; font-weight: 700; color: #94a3b8; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .grid-controls { display: grid; grid-template-columns: 1fr; gap: 10px; }
-  .grid-controls button { width: 100%; }
-  
-  .name-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(2, 6, 23, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; margin-bottom: 8px; gap: 10px; }
-  .name-row span { word-break: break-word; overflow: hidden; }
-  #name-list { max-height: 380px; overflow-y: auto; margin-top: 12px; padding-right: 4px; }
-  
-  .badge { background: rgba(242, 193, 78, 0.2); color: #f2c14e; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 4px; border: 1px solid rgba(242, 193, 78, 0.4); white-space: nowrap; display: inline-block; }
+  /* Back to Portal Header Button */
+  .back-nav {
+    position: absolute; top: 20px; left: 20px; z-index: 20;
+    text-decoration: none; color: #00ffcc; font-size: 13px; font-weight: 700;
+    background: rgba(10, 20, 35, 0.7); backdrop-filter: blur(12px);
+    padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(0, 255, 204, 0.3);
+    transition: 0.2s; box-shadow: 0 4px 16px rgba(0, 255, 204, 0.1);
+  }
+  .back-nav:hover { background: rgba(0, 255, 204, 0.2); color: #fff; }
 
-  /* Desktop and Tablet Enhancements */
-  @media (min-width: 600px) {
-    body { padding: 24px; }
-    h1 { font-size: 24px; }
-    .card { padding: 24px; }
-    input { margin-bottom: 0; }
-    .grid-controls { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .container {
+    position: relative; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 40px 16px; text-align: center;
+  }
+
+  /* Login Card */
+  #login-card {
+    background: rgba(10, 20, 35, 0.85); backdrop-filter: blur(16px);
+    border: 1px solid rgba(0, 255, 204, 0.35); padding: 36px 28px; border-radius: 20px;
+    width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0, 255, 204, 0.15);
+  }
+
+  /* Control Dashboard (Hidden until authenticated) */
+  #dashboard {
+    display: none; width: 100%; max-width: 900px; text-align: left;
+  }
+
+  h1 { color: #00ffcc; font-size: 22px; margin-top: 0; margin-bottom: 8px; letter-spacing: 0.5px; text-shadow: 0 0 10px rgba(0,255,204,0.4); }
+  p.subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+
+  .input-group { margin-bottom: 16px; text-align: left; }
+  label { display: block; font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  
+  input {
+    width: 100%; padding: 14px 16px; border-radius: 10px;
+    background: #020617; border: 1px solid rgba(0, 255, 204, 0.4);
+    color: #fff; font-size: 16px; font-weight: 600; outline: none; transition: 0.2s; text-align: center; letter-spacing: 4px;
+  }
+  input:focus { border-color: #00ffcc; box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
+
+  button {
+    width: 100%; padding: 14px; border-radius: 10px; border: none;
+    background: #00ffcc; color: #040914; font-size: 15px; font-weight: 800;
+    cursor: pointer; transition: 0.2s; margin-top: 6px; letter-spacing: 0.5px;
+    box-shadow: 0 4px 16px rgba(0, 255, 204, 0.3);
+  }
+  button:hover { background: #38bdf8; box-shadow: 0 4px 20px rgba(56, 189, 248, 0.5); }
+  
+  .danger-btn { background: #f43f5e; color: #fff; box-shadow: 0 4px 16px rgba(244, 63, 94, 0.3); }
+  .danger-btn:hover { background: #e11d48; box-shadow: 0 4px 20px rgba(225, 29, 72, 0.5); }
+
+  .card-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; width: 100%; margin-bottom: 24px;
+  }
+  .panel-card {
+    background: rgba(10, 20, 35, 0.8); backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 255, 204, 0.3); padding: 24px; border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 255, 204, 0.1);
+  }
+  .panel-card h3 { color: #00ffcc; margin-top: 0; font-size: 16px; margin-bottom: 12px; }
+
+  #error-msg { color: #f43f5e; font-size: 12px; font-weight: 600; margin-top: 10px; min-height: 16px; }
+
+  /* Names Table */
+  .table-container {
+    background: rgba(10, 20, 35, 0.8); backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 255, 204, 0.3); border-radius: 16px; padding: 20px;
+    width: 100%; max-height: 350px; overflow-y: auto;
+  }
+  table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+  th { color: #38bdf8; padding-bottom: 10px; border-bottom: 1px solid rgba(0,255,204,0.2); }
+  td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .action-btn { padding: 6px 12px; font-size: 11px; border-radius: 6px; width: auto; margin-right: 6px; }
+
+  .watermark {
+    margin-top: 30px; font-size: 11px; color: rgba(0, 255, 204, 0.45);
+    font-weight: 500; letter-spacing: 0.5px;
   }
 </style>
 </head>
 <body>
 
-  <h1>TAM Penang 80th Anniversary — Control Panel</h1>
-  
-  <div class="card" id="login-card">
-    <div class="section-title">Authentication Required</div>
-    <div class="flex-row">
-      <input type="password" id="pin-input" placeholder="Enter Admin PIN (Default: 2026)">
-      <button onclick="loadNames()">Access</button>
-    </div>
-  </div>
+  <a href="/index.html" class="back-nav">← Back to Portal</a>
+  <canvas id="bg"></canvas>
 
-  <div class="card" id="dashboard" style="display:none;">
-    
-    <!-- Emcee & Display Controls -->
-    <div class="section-title">Emcee & Display Controls</div>
-    <div class="grid-controls" style="margin-bottom: 20px;">
-      <button class="secondary" onclick="triggerScene('collecting')">Resume Live Wall</button>
-      <button onclick="triggerScene('title')">Show Title & Fireworks</button>
-      <button class="secondary" onclick="fillRandom(10)">+10 Placeholders</button>
-      <button class="danger" onclick="resetAll()">Reset All Names</button>
+  <div class="container">
+    <!-- PIN Login Card -->
+    <div id="login-card">
+      <h1>Admin Authentication</h1>
+      <p class="subtitle">Enter committee PIN to access control panel</p>
+      <form onsubmit="handleLogin(event)">
+        <div class="input-group">
+          <input type="password" id="pin-input" placeholder="••••" maxlength="6" required autocomplete="current-password">
+        </div>
+        <button type="submit">Authenticate</button>
+      </form>
+      <div id="error-msg"></div>
     </div>
 
-    <!-- VIP / President Zoom Feature -->
-    <div class="section-title" style="margin-top: 24px;">VIP / President Spotlight Zoom</div>
-    <div class="flex-row">
-      <input type="text" id="zoom-name-input" placeholder="Enter VIP Name (e.g. Ts. Soon)">
-      <button onclick="triggerZoom()">Trigger Zoom</button>
+    <!-- Main Dashboard (Unlocked) -->
+    <div id="dashboard">
+      <h1>TAM 80th Anniversary — Control Panel</h1>
+      <p class="subtitle">Manage live wall states, spotlights, and moderation</p>
+
+      <div class="card-grid">
+        <div class="panel-card">
+          <h3>Scene Controls</h3>
+          <button onclick="triggerScene('collecting')">🟢 Normal Wall Mode</button>
+          <button onclick="triggerScene('title')" style="margin-top: 10px;">🎆 Trigger 80th Title & Fireworks</button>
+        </div>
+
+        <div class="panel-card">
+          <h3>Danger Zone</h3>
+          <button class="danger-btn" onclick="triggerReset()">⚠️ Reset Wall (Clear All)</button>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <h3>Live Submissions Moderation</h3>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="names-table-body">
+              <tr><td colspan="3" style="text-align:center; color:#94a3b8;">Loading nodes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <!-- Live Submissions List -->
-    <div class="section-title" style="margin-top: 28px;">Live Submissions (<span id="count">0</span>)</div>
-    <div id="name-list"></div>
-
+    <div class="watermark">Designed & Developed by Ts. Choong Hui Ping</div>
   </div>
 
 <script>
-let currentPin = '';
+const bgCanvas = document.getElementById('bg');
+const bgCtx = bgCanvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+let netNodes = [];
 
-async function loadNames() {
-  currentPin = document.getElementById('pin-input').value;
-  const res = await fetch(`/api/admin/names?pin=${currentPin}`);
-  if (!res.ok) { alert('Incorrect PIN'); return; }
-  
-  document.getElementById('login-card').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
-  fetchNamesLoop();
+for(let i=0; i<60; i++) {
+  netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
 }
 
-async function fetchNamesLoop() {
-  const res = await fetch(`/api/admin/names?pin=${currentPin}`);
-  if (res.ok) {
-    const data = await res.json();
-    renderList(data.names);
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  bgCanvas.width = W * DPR; bgCanvas.height = H * DPR;
+  bgCanvas.style.width = W + 'px'; bgCanvas.style.height = H + 'px';
+  bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+function animate() {
+  bgCtx.clearRect(0, 0, W, H);
+  bgCtx.lineWidth = 2;
+  for(let i=0; i<netNodes.length; i++) {
+    let n = netNodes[i];
+    n.x += n.vx; n.y += n.vy;
+    if(n.x < 0 || n.x > 1) n.vx *= -1;
+    if(n.y < 0 || n.y > 1) n.vy *= -1;
+    let px = n.x * W, py = n.y * H;
+    bgCtx.fillStyle = '#00ffcc';
+    bgCtx.shadowColor = 'rgba(0, 255, 204, 0.8)';
+    bgCtx.shadowBlur = 6;
+    bgCtx.beginPath(); bgCtx.arc(px, py, 3, 0, Math.PI*2); bgCtx.fill();
+    bgCtx.shadowBlur = 0;
+    
+    for(let j=i+1; j<netNodes.length; j++) {
+      let n2 = netNodes[j];
+      let p2x = n2.x * W, p2y = n2.y * H;
+      let dist = Math.hypot(px - p2x, py - p2y);
+      if(dist < 180) {
+        bgCtx.strokeStyle = `rgba(0, 255, 204, ${0.35 * (1 - dist/180)})`;
+        bgCtx.beginPath(); bgCtx.moveTo(px, py); bgCtx.lineTo(p2x, p2y); bgCtx.stroke();
+      }
+    }
   }
-  setTimeout(fetchNamesLoop, 3000);
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// Bulletproof PIN Login Handler
+async function handleLogin(e) {
+  e.preventDefault();
+  const pin = document.getElementById('pin-input').value.trim();
+  const errEl = document.getElementById('error-msg');
+  errEl.textContent = 'Authenticating...';
+
+  try {
+    const res = await fetch('/api/admin/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passcode: pin, pin: pin })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      document.getElementById('login-card').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      loadNames();
+    } else {
+      errEl.textContent = 'Incorrect PIN. Please try again.';
+      document.getElementById('pin-input').value = '';
+    }
+  } catch (err) {
+    errEl.textContent = 'Server connection error.';
+  }
 }
 
-function renderList(names) {
-  const listEl = document.getElementById('name-list');
-  document.getElementById('count').textContent = names.length;
-  if (names.length === 0) { listEl.innerHTML = '<p style="color: #64748b; font-style: italic;">No submissions yet.</p>'; return; }
-  
-  listEl.innerHTML = names.map(n => `
-    <div class="name-row">
-      <span><strong>${n.name}</strong> ${n.featured ? '<span class="badge">VIP / Featured</span>' : ''}</span>
-      <button class="danger" style="width: auto; padding: 6px 12px; font-size: 12px; min-width: 70px;" onclick="deleteName('${n.id}')">Delete</button>
-    </div>
+let allNames = [];
+async function loadNames() {
+  try {
+    const res = await fetch('/api/events');
+    // We can also fetch the sync state via a quick EventSource listener or separate endpoint
+  } catch (err) {}
+}
+
+// Connect SSE to populate moderation table live
+const source = new EventSource('/api/events');
+source.addEventListener('sync', (e) => {
+  const data = JSON.parse(e.data);
+  allNames = data.names || [];
+  renderTable();
+});
+source.addEventListener('name:new', (e) => {
+  allNames.push(JSON.parse(e.data));
+  renderTable();
+});
+source.addEventListener('name:hidden', (e) => {
+  const id = JSON.parse(e.data).id;
+  const item = allNames.find(n => n.id === id);
+  if (item) item.hidden = true;
+  renderTable();
+});
+source.addEventListener('name:deleted', (e) => {
+  const id = JSON.parse(e.data).id;
+  allNames = allNames.filter(n => n.id !== id);
+  renderTable();
+});
+source.addEventListener('name:reset', () => {
+  allNames = [];
+  renderTable();
+});
+
+function renderTable() {
+  const tbody = document.getElementById('names-table-body');
+  if (allNames.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">No nodes submitted yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = allNames.map(n => `
+    <tr>
+      <td>${escapeHtml(n.name)}</td>
+      <td style="color:${n.hidden ? '#f43f5e' : '#34d399'}">${n.hidden ? 'Hidden' : 'Active'}</td>
+      <td>
+        <button class="action-btn danger-btn" onclick="deleteName('${n.id}')">Delete</button>
+      </td>
+    </tr>
   `).join('');
 }
 
-async function deleteName(id) {
-  if (!confirm('Permanently delete this name from the display?')) return;
-  await fetch('/api/admin/delete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: currentPin, id })
-  });
-  loadNames();
-}
-
-async function fillRandom(count) {
-  await fetch('/api/admin/fill-random', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: currentPin, count })
-  });
-  loadNames();
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 async function triggerScene(state) {
-  await fetch('/api/admin/scene', {
+  await fetch('/api/scene', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: currentPin, state })
+    body: JSON.stringify({ state })
   });
 }
 
-async function triggerZoom() {
-  const name = document.getElementById('zoom-name-input').value.trim();
-  if (!name) { alert('Please enter a name for the VIP zoom.'); return; }
-  
-  await fetch('/api/admin/scene', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: currentPin, state: 'zoom', payload: { name } })
-  });
-  document.getElementById('zoom-name-input').value = '';
-  loadNames();
+async function triggerReset() {
+  if (confirm('Are you sure you want to clear all nodes and reset the wall?')) {
+    await fetch('/api/reset', { method: 'POST' });
+  }
 }
 
-async function resetAll() {
-  if (!confirm('WARNING: This will completely wipe all current names from the screen! Proceed?')) return;
-  await fetch('/api/admin/scene', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: currentPin, state: 'reset' })
-  });
-  loadNames();
+async function deleteName(id) {
+  await fetch(`/api/names/${id}/delete`, { method: 'POST' });
 }
 </script>
 </body>
