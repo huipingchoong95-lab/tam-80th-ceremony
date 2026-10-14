@@ -391,12 +391,17 @@ function checkIsPresident(name, featured) {
 }
 
 function rebuildSlotsAndRedraw() {
-  slots = buildSlots(placed.size + 1); slotIndex = 0;
+  slots = buildSlots(placed.size); 
+  slotIndex = 0;
   const entries = Array.from(placed.values());
   placed.clear();
   baseCtx.clearRect(0, 0, W, H);
   drawIdleOutline();
-  for (const w of entries) stampWord(baseCtx, w, 1);
+  for (const w of entries) {
+    placed.set(w.id, w); // RESTORE INTO PLACED MAP
+    stampWord(baseCtx, w, 1);
+  }
+  counterEl.textContent = placed.size;
 }
 
 function drawIdleOutline() {
@@ -429,7 +434,6 @@ function updateAllFontSizesExcept(excludeId) {
 }
 
 function assignAndDraw(id, name, featured, immediate) {
-  // Prevent duplicate rendering if node already exists
   if (placed.has(id)) return;
 
   if (slots.length === 0 || slotIndex >= slots.length || placed.size >= slots.length) {
@@ -441,13 +445,11 @@ function assignAndDraw(id, name, featured, immediate) {
   const slot = slots[slotIndex % slots.length];
   slotIndex++;
 
-  // Calculate distinct position for featured entries vs regular entries
   let targetX = slot.x;
   let targetY = slot.y;
   let fontPx = getTargetFontSize(placed.size + 1);
 
   if (isPres) {
-    // Count existing featured entries to stack them without overlapping
     let featuredCount = 0;
     for (const p of placed.values()) { if (p.featured) featuredCount++; }
     targetX = W / 2;
@@ -595,8 +597,18 @@ source.addEventListener('sync', (e) => {
   ensureLoop();
 });
 source.addEventListener('name:new', (e) => assignAndDraw(JSON.parse(e.data).id, JSON.parse(e.data).name, JSON.parse(e.data).featured, false));
-source.addEventListener('name:hidden', (e) => { placed.delete(JSON.parse(e.data).id); rebuildSlotsAndRedraw(); });
-source.addEventListener('name:deleted', (e) => { placed.delete(JSON.parse(e.data).id); rebuildSlotsAndRedraw(); });
+source.addEventListener('names:batch', (e) => {
+  const batch = JSON.parse(e.data);
+  for (const n of batch) {
+    if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, false);
+  }
+});
+source.addEventListener('name:deleted', (e) => { 
+  const id = JSON.parse(e.data).id;
+  placed.delete(id); 
+  counterEl.textContent = placed.size;
+  rebuildSlotsAndRedraw(); 
+});
 source.addEventListener('name:reset', () => { placed.clear(); slotIndex = 0; titleAnim = null; zoomAnim = null; dimAlpha = 0; counterEl.textContent = '0'; slots = buildSlots(1); baseCtx.clearRect(0, 0, W, H); drawIdleOutline(); });
 
 source.addEventListener('scene:change', (e) => {
