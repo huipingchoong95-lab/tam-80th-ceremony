@@ -11,15 +11,6 @@
   #bg { z-index: 1; }
   #fx { z-index: 2; pointer-events: none; }
 
-  .back-nav {
-    position: absolute; top: 20px; left: 20px; z-index: 20;
-    text-decoration: none; color: #00ffcc; font-size: 13px; font-weight: 700;
-    background: rgba(10, 20, 35, 0.7); backdrop-filter: blur(12px);
-    padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(0, 255, 204, 0.3);
-    transition: 0.2s; box-shadow: 0 4px 16px rgba(0, 255, 204, 0.1);
-  }
-  .back-nav:hover { background: rgba(0, 255, 204, 0.2); color: #fff; }
-
   .container {
     position: relative; z-index: 10;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -77,8 +68,6 @@
 </style>
 </head>
 <body>
-
-  <a href="/index.html" class="back-nav">← Back to Portal</a>
 
   <canvas id="bg"></canvas>
   <canvas id="fx"></canvas>
@@ -159,7 +148,6 @@ function animate() {
 }
 requestAnimationFrame(animate);
 
-// Photon Shooting Upward Animation + API Transmission
 async function handleTransmit(e) {
   e.preventDefault();
   const inputEl = document.getElementById('name-input');
@@ -173,7 +161,6 @@ async function handleTransmit(e) {
   log.style.color = '#38bdf8';
   log.textContent = `[SYN] Initializing quantum packet stream...`;
 
-  // Create Photon Light Particle at input box
   const inputRect = inputEl.getBoundingClientRect();
   const photon = document.createElement('div');
   photon.className = 'photon-particle';
@@ -182,13 +169,11 @@ async function handleTransmit(e) {
   photon.style.top = `${inputRect.top}px`;
   document.body.appendChild(photon);
 
-  // Trigger upward launch animation
   requestAnimationFrame(() => {
     photon.style.transform = `translateY(-130vh) scale(0.3)`;
     photon.style.opacity = '0';
   });
 
-  // Send name to server
   try {
     const res = await fetch('/api/names', {
       method: 'POST',
@@ -210,7 +195,6 @@ async function handleTransmit(e) {
     log.textContent = `[TIMEOUT] Network unreachable.`;
   }
 
-  // Cleanup photon DOM element after animation
   setTimeout(() => photon.remove(), 900);
 
   setTimeout(() => {
