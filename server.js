@@ -47,13 +47,17 @@ app.get('/api/qr', async (req, res) => {
   }
 });
 
-// Admin PIN Authentication Route (PIN: 2026)
+// Bulletproof Admin PIN Verification Route (Supports PIN: 2026)
 app.post('/api/admin/auth', (req, res) => {
-  const { pin } = req.body || {};
-  if (pin === '2026' || pin === 2026) {
-    return res.json({ success: true });
+  const body = req.body || {};
+  // Check any field the admin script might send (pin, password, or passcode)
+  const submittedPin = String(body.pin || body.password || body.passcode || '').trim();
+
+  if (submittedPin === '2026') {
+    return res.json({ success: true, token: 'authenticated' });
   }
-  return res.status(401).json({ success: false, error: 'Invalid PIN' });
+
+  return res.status(401).json({ success: false, error: 'Incorrect PIN' });
 });
 
 // Name submission endpoint
