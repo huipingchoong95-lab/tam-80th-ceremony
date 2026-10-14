@@ -173,7 +173,7 @@ function generateShapePoints() {
   }
 }
 
-// Incoming Trailing Light Tracer Packet with smooth fade-out
+// Medium-speed incoming tracer packet (speed: 16)
 class IncomingPacket {
   constructor(wordObj) {
     this.wordObj = wordObj;
@@ -183,7 +183,7 @@ class IncomingPacket {
     this.y = this.startY;
     this.targetX = wordObj.x;
     this.targetY = wordObj.y;
-    this.speed = 28;
+    this.speed = 16;
     this.trail = [];
     this.fading = false;
     this.trailAlpha = 1;
@@ -196,7 +196,7 @@ class IncomingPacket {
       let dist = Math.hypot(dx, dy);
 
       this.trail.push({ x: this.x, y: this.y });
-      if (this.trail.length > 15) this.trail.shift();
+      if (this.trail.length > 18) this.trail.shift();
 
       if (dist < this.speed) {
         this.fading = true;
@@ -207,8 +207,7 @@ class IncomingPacket {
         this.y += (dy / dist) * this.speed;
       }
     } else {
-      // Fade out trail smoothly after reaching target
-      this.trailAlpha -= 0.08;
+      this.trailAlpha -= 0.06;
       if (this.trailAlpha <= 0) this.alive = false;
     }
   }
