@@ -76,11 +76,10 @@ const ZOOM_HOLD_MS = 2200;
 const ZOOM_OUT_MS = 900;
 const TITLE_IN_MS = 1200;
 
-// Web Audio API for synthesized explosions
+// Web Audio API for synthesized explosions & arrival sounds
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioCtx = new AudioContext();
 
-// Universal auto-unlock handler for browser audio policies
 ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => {
   document.addEventListener(evt, () => {
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -111,6 +110,19 @@ function playBoom() {
   noise.start();
 }
 
+function playLaserBlip() {
+  if (audioCtx.state === 'suspended') return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.25);
+  gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+}
+
 const tamLogo = new Image();
 tamLogo.onload = () => { if (titleAnim) ensureLoop(); };
 tamLogo.src = './tam-logo.png';
@@ -125,7 +137,7 @@ const counterEl = document.getElementById('counter');
 
 let W = 0, H = 0, DPR = 1;
 let slots = [], placed = new Map(), slotIndex = 0;
-let animatingWords = [], loopRunning = false;
+let incomingPackets = [], loopRunning = false;
 let dimAlpha = 0, zoomAnim = null, titleAnim = null;
 let fireworks = [], particles = [], netNodes = [];
 let shapePointsMap = {}, sequenceIndex = 0, fireworkTimer = 0;
@@ -134,7 +146,6 @@ for(let i=0; i<65; i++) {
   netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
 }
 
-// Generate localized word offset coordinates centered around (0,0)
 function generateShapePoints() {
   shapePointsMap = {};
   const boxW = 400, boxH = 200;
@@ -156,7 +167,6 @@ function generateShapePoints() {
     for (let y = 0; y < boxH; y += step) {
       for (let x = 0; x < boxW; x += step) {
         if (img[(y * boxW + x) * 4 + 3] > 128) {
-          // Store offsets relative to origin (0, 0)
           points.push({ dx: x - boxW / 2, dy: y - boxH / 2 });
         }
       }
@@ -165,9 +175,65 @@ function generateShapePoints() {
   }
 }
 
+// Incoming Trailing Light Tracer Packet Class for Display Screen
+class IncomingPacket {
+  constructor(wordObj) {
+    this.wordObj = wordObj;
+    this.startX = Math.random() * W;
+    this.startY = -20;
+    this.x = this.startX;
+    this.y = this.startY;
+    this.targetX = wordObj.x;
+    this.targetY = wordObj.y;
+    this.speed = 28;
+    this.trail = [];
+    this.alive = true;
+  }
+  update() {
+    let dx = this.targetX - this.x;
+    let dy = this.targetY - this.y;
+    let dist = Math.hypot(dx, dy);
+
+    this.trail.push({ x: this.x, y: this.y });
+    if (this.trail.length > 15) this.trail.shift();
+
+    if (dist < this.speed) {
+      this.alive = false;
+      playLaserBlip();
+      stampWord(baseCtx, this.wordObj, 1);
+    } else {
+      this.x += (dx / dist) * this.speed;
+      this.y += (dy / dist) * this.speed;
+    }
+  }
+  draw() {
+    if (this.trail.length > 1) {
+      fxCtx.save();
+      fxCtx.strokeStyle = 'rgba(0, 255, 204, 0.75)';
+      fxCtx.lineWidth = 3.5;
+      fxCtx.shadowColor = '#00ffcc';
+      fxCtx.shadowBlur = 12;
+      fxCtx.beginPath();
+      fxCtx.moveTo(this.trail[0].x, this.trail[0].y);
+      for (let t of this.trail) fxCtx.lineTo(t.x, t.y);
+      fxCtx.stroke();
+      fxCtx.restore();
+    }
+
+    // Packet Head Photon
+    fxCtx.save();
+    fxCtx.fillStyle = '#ffffff';
+    fxCtx.shadowColor = '#00ffcc';
+    fxCtx.shadowBlur = 20;
+    fxCtx.beginPath();
+    fxCtx.arc(this.x, this.y, 6, 0, Math.PI * 2);
+    fxCtx.fill();
+    fxCtx.restore();
+  }
+}
+
 class Firework {
   constructor(word) {
-    // Random launch and target height across screen
     this.x = Math.random() * (W * 0.65) + (W * 0.175);
     this.y = H;
     this.targetY = Math.random() * (H * 0.35) + (H * 0.15);
@@ -191,12 +257,9 @@ class Firework {
     const count = Math.min(points.length, 260);
     const shuffled = [...points].sort(() => Math.random() - 0.5);
 
-    // Form word relative to this exact explosion location (this.x, this.targetY)
     for (let i = 0; i < count; i++) {
       const pt = shuffled[i % shuffled.length];
-      const targetX = this.x + pt.dx;
-      const targetY = this.targetY + pt.dy;
-      particles.push(new ShapeParticle(this.x, this.targetY, targetX, targetY, this.color));
+      particles.push(new ShapeParticle(this.x, this.targetY, this.x + pt.dx, this.targetY + pt.dy, this.color));
     }
   }
   draw() {
@@ -207,40 +270,25 @@ class Firework {
 
 class ShapeParticle {
   constructor(startX, startY, targetX, targetY, color) {
-    this.x = startX;
-    this.y = startY;
-    this.targetX = targetX;
-    this.targetY = targetY;
-    
-    // Initial radial explosion burst velocity
+    this.x = startX; this.y = startY;
+    this.targetX = targetX; this.targetY = targetY;
     const angle = Math.random() * Math.PI * 2;
     const speed = Math.random() * 7 + 2;
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
-    
-    this.alpha = 1;
-    this.color = color;
-    this.phase = 'burst';
-    this.timer = 0;
+    this.alpha = 1; this.color = color;
+    this.phase = 'burst'; this.timer = 0;
   }
   update() {
     this.timer++;
     if (this.phase === 'burst') {
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vx *= 0.88;
-      this.vy *= 0.88;
-      if (this.timer > 18) {
-        this.phase = 'forming';
-      }
+      this.x += this.vx; this.y += this.vy;
+      this.vx *= 0.88; this.vy *= 0.88;
+      if (this.timer > 18) this.phase = 'forming';
     } else {
-      // Smoothly lock into local word offsets at explosion spot
       this.x += (this.targetX - this.x) * 0.12;
       this.y += (this.targetY - this.y) * 0.12;
-      
-      if (this.timer > 110) {
-        this.alpha -= 0.025;
-      }
+      if (this.timer > 110) this.alpha -= 0.025;
     }
   }
   draw() {
@@ -250,9 +298,7 @@ class ShapeParticle {
     fxCtx.fillStyle = this.color;
     fxCtx.shadowColor = this.color;
     fxCtx.shadowBlur = 8;
-    fxCtx.beginPath();
-    fxCtx.arc(this.x, this.y, 2.2, 0, Math.PI * 2);
-    fxCtx.fill();
+    fxCtx.beginPath(); fxCtx.arc(this.x, this.y, 2.2, 0, Math.PI * 2); fxCtx.fill();
     fxCtx.restore();
   }
 }
@@ -294,7 +340,7 @@ function animateBg() {
       let p2x = n2.x * W, p2y = n2.y * H;
       let dist = Math.hypot(px - p2x, py - p2y);
       if(dist < 180) {
-        bgCtx.strokeStyle = `rgba(0, 255, 204, ${0.4 * (1 - dist/180)})`;
+        bgCtx.strokeStyle = `rgba(0, 255, 204, ${0.35 * (1 - dist/180)})`;
         bgCtx.beginPath(); bgCtx.moveTo(px, py); bgCtx.lineTo(p2x, p2y); bgCtx.stroke();
       }
     }
@@ -312,7 +358,6 @@ function buildSlots(totalCount = 50) {
   octx.fillText(SHAPE_TEXT, W / 2, H / 2);
 
   const img = octx.getImageData(0, 0, W, H).data;
-  
   let cellSize = 36;
   if (totalCount > 150) cellSize = 14;
   else if (totalCount > 100) cellSize = 18;
@@ -362,7 +407,7 @@ function rebuildSlotsAndRedraw() {
   placed.clear();
   baseCtx.clearRect(0, 0, W, H);
   drawIdleOutline();
-  for (const w of entries) assignAndDraw(w.id, w.name, w.featured, true);
+  for (const w of entries) stampWord(baseCtx, w, 1);
 }
 
 function drawIdleOutline() {
@@ -402,7 +447,7 @@ function assignAndDraw(id, name, featured, immediate) {
     const wordObj = { id, name, x: W / 2, y: H / 2, rot: 0, color: FEATURED_COLOR, fontPx: Math.max(56, Math.min(W * 0.055, 84)), featured: true };
     placed.set(id, wordObj); counterEl.textContent = placed.size;
     if (immediate) stampWord(baseCtx, wordObj, 1);
-    else { animatingWords.push({ ...wordObj, start: performance.now() }); ensureLoop(); }
+    else { incomingPackets.push(new IncomingPacket(wordObj)); ensureLoop(); }
     return;
   }
 
@@ -417,10 +462,12 @@ function assignAndDraw(id, name, featured, immediate) {
   const wordObj = { id, name, x: slot.x, y: slot.y, rot: (Math.random() * 10 - 5) * (Math.PI / 180), color: pickColor(name), fontPx: targetFont, featured: false };
   placed.set(id, wordObj); counterEl.textContent = placed.size;
 
-  if (immediate) stampWord(baseCtx, wordObj, 1);
-  else {
+  if (immediate) {
+    stampWord(baseCtx, wordObj, 1);
+  } else {
     updateAllFontSizesExcept(id);
-    animatingWords.push({ ...wordObj, start: performance.now() });
+    // Launch incoming trailing light tracer from top of screen to this slot!
+    incomingPackets.push(new IncomingPacket(wordObj));
     ensureLoop();
   }
 }
@@ -445,10 +492,13 @@ function loop(now) {
   fxCtx.clearRect(0, 0, W, H);
   let stillActive = false;
 
-  for (let i = animatingWords.length - 1; i >= 0; i--) {
-    const w = animatingWords[i]; const t = Math.min(1, (now - w.start) / POPIN_MS);
-    if (t >= 1) { stampWord(baseCtx, w, 1); animatingWords.splice(i, 1); }
-    else { stampWord(fxCtx, w, easeOutBack(t)); stillActive = true; }
+  // Render incoming trailing light packets
+  for (let i = incomingPackets.length - 1; i >= 0; i--) {
+    let p = incomingPackets[i];
+    p.update();
+    p.draw();
+    if (!p.alive) incomingPackets.splice(i, 1);
+    else stillActive = true;
   }
 
   if (dimAlpha > 0) {
@@ -472,7 +522,6 @@ function loop(now) {
     const elapsed = now - titleAnim.start;
     dimAlpha = Math.max(dimAlpha, 0.85);
     
-    // Launch fireworks strictly in sequence: "80" -> "TAM" -> "2027"
     fireworkTimer++;
     if (fireworkTimer % 75 === 0) {
       const currentWord = FIREWORK_WORDS[sequenceIndex % FIREWORK_WORDS.length];
@@ -496,7 +545,7 @@ function loop(now) {
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
 
-  if (stillActive || fireworks.length > 0 || particles.length > 0) requestAnimationFrame(loop);
+  if (stillActive || fireworks.length > 0 || particles.length > 0 || incomingPackets.length > 0) requestAnimationFrame(loop);
   else loopRunning = false;
 }
 
@@ -564,6 +613,7 @@ source.addEventListener('scene:change', (e) => {
     fxCtx.clearRect(0, 0, W, H);
     fireworks = [];
     particles = [];
+    incomingPackets = [];
   } else if (scene.state === 'zoom') { 
     zoomAnim = { name: scene.payload.name, targetSlot: { x: W / 2, y: H / 2 }, targetFontPx: 80, start: performance.now() }; 
     ensureLoop(); 
