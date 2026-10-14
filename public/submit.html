@@ -21,7 +21,7 @@
     background: rgba(10, 20, 35, 0.75); backdrop-filter: blur(16px);
     border: 1px solid rgba(0, 255, 204, 0.35); padding: 32px 28px; border-radius: 20px;
     width: 100%; max-width: 440px; box-shadow: 0 8px 32px rgba(0, 255, 204, 0.15);
-    text-align: center;
+    text-align: center; position: relative; overflow: hidden;
   }
 
   h1 { color: #00ffcc; font-size: 22px; margin-top: 0; margin-bottom: 8px; letter-spacing: 0.5px; text-shadow: 0 0 10px rgba(0,255,204,0.4); }
@@ -51,17 +51,24 @@
     text-shadow: 0 0 6px rgba(52, 211, 153, 0.4); word-break: break-all;
   }
 
-  /* Glowing Ball of Light Energy Orb Effect */
+  /* Energy Flash Pulse Layer */
+  .flash-burst {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle, rgba(0,255,204,0.8) 0%, rgba(0,255,204,0) 70%);
+    opacity: 0; pointer-events: none; transition: opacity 0.15s ease-out;
+  }
+
+  /* Energy Orb Particle */
   .energy-orb {
     position: fixed; z-index: 999;
-    background: radial-gradient(circle, #ffffff 0%, #00ffcc 60%, #0284c7 100%);
+    background: radial-gradient(circle, #ffffff 0%, #00ffcc 50%, #0284c7 100%);
     color: #040914; font-weight: 800; font-size: 13px;
-    padding: 10px 18px; border-radius: 50px;
-    box-shadow: 0 0 35px #00ffcc, 0 0 15px #ffffff, inset 0 0 10px #ffffff;
+    padding: 10px 20px; border-radius: 50px;
+    box-shadow: 0 0 35px #00ffcc, 0 0 18px #ffffff, inset 0 0 12px #ffffff;
     pointer-events: none;
-    transform: scale(0.2);
+    transform: translate(-50%, -50%) scale(0.1);
     opacity: 0;
-    transition: transform 0.85s cubic-bezier(0.1, 1, 0.3, 1), opacity 0.4s ease-in-out;
+    transition: transform 0.85s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease-in-out;
   }
 
   .watermark {
@@ -76,7 +83,8 @@
   <canvas id="fx"></canvas>
 
   <div class="container">
-    <div class="card">
+    <div class="card" id="form-card">
+      <div class="flash-burst" id="flash"></div>
       <h1>TAM 80th Anniversary</h1>
       <p class="subtitle">Connect your node to the live celebration wall</p>
       
@@ -157,33 +165,43 @@ async function handleTransmit(e) {
   const nameVal = inputEl.value.trim();
   const btn = document.getElementById('transmit-btn');
   const log = document.getElementById('console-log');
+  const flashEl = document.getElementById('flash');
 
   if (!nameVal) return;
 
   btn.disabled = true;
   log.style.color = '#38bdf8';
-  log.textContent = `[SYN] Condensing name into energy orb...`;
+  log.textContent = `[SYN] Initializing quantum packet stream...`;
 
-  // Create Energy Orb at input field position
+  // Step 1: Trigger Energy Flash
+  flashEl.style.opacity = '1';
+  setTimeout(() => { flashEl.style.opacity = '0'; }, 200);
+
+  // Step 2: Create Orb at center of input box
   const inputRect = inputEl.getBoundingClientRect();
+  const startX = inputRect.left + inputRect.width / 2;
+  const startY = inputRect.top + inputRect.height / 2;
+
   const orb = document.createElement('div');
   orb.className = 'energy-orb';
   orb.textContent = nameVal;
-  orb.style.left = `${inputRect.left + inputRect.width / 2 - 60}px`;
-  orb.style.top = `${inputRect.top + inputRect.height / 2 - 20}px`;
+  orb.style.left = `${startX}px`;
+  orb.style.top = `${startY}px`;
   document.body.appendChild(orb);
 
-  // Trigger expansion into light ball, then rocket straight up
+  // Step 3: Fade in and expand into Ball of Light
   requestAnimationFrame(() => {
     orb.style.opacity = '1';
-    orb.style.transform = 'scale(1.1)';
+    orb.style.transform = 'translate(-50%, -50%) scale(1)';
   });
 
+  // Step 4: Rocket straight up off the mobile / browser screen!
   setTimeout(() => {
-    orb.style.transform = 'translateY(-140vh) scale(0.2)';
+    orb.style.transform = 'translate(-50%, -150vh) scale(0.3)';
     orb.style.opacity = '0';
-  }, 2500);
+  }, 350);
 
+  // Step 5: Send API request to server
   try {
     const res = await fetch('/api/names', {
       method: 'POST',
@@ -193,7 +211,7 @@ async function handleTransmit(e) {
 
     if (res.ok) {
       log.style.color = '#34d399';
-      log.textContent = `[ACK 200 OK] Energy packet launched to display wall!`;
+      log.textContent = `[ACK 200 OK] Energy node launched to display wall!`;
       inputEl.value = '';
     } else {
       const errData = await res.json().catch(() => ({}));
@@ -205,7 +223,8 @@ async function handleTransmit(e) {
     log.textContent = `[TIMEOUT] Network unreachable.`;
   }
 
-  setTimeout(() => orb.remove(), 1100);
+  // Cleanup orb element
+  setTimeout(() => orb.remove(), 1200);
 
   setTimeout(() => {
     btn.disabled = false;
