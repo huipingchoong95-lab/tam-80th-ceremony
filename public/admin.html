@@ -265,6 +265,15 @@ source.addEventListener('name:new', (e) => {
     renderTable();
   }
 });
+source.addEventListener('names:batch', (e) => {
+  const batch = JSON.parse(e.data);
+  for (const n of batch) {
+    if (!allNames.some(item => item.id === n.id)) {
+      allNames.push(n);
+    }
+  }
+  renderTable();
+});
 source.addEventListener('name:deleted', (e) => {
   const id = JSON.parse(e.data).id;
   allNames = allNames.filter(n => n.id !== id);
@@ -318,26 +327,19 @@ async function triggerVipZoom() {
   setTimeout(() => { vipBtn.disabled = false; }, 1200);
 }
 
-const sampleNames = [
-  "Ir. Tan Eng Tat", "Ts. Teh Seng Khoon", "Engr. Lim Chee Keong", "Ts. Dr. Karen Wong", 
-  "Ir. Chong Wei Ming", "Ts. Alvin Lee", "Ir. Saravanan A/L Raman", "Ts. Chan May Ling", 
-  "Engr. David Ooi", "Ts. Bernard Tan", "Ir. Khor Swee Heng", "Ts. Grace Chew"
-];
-
-// Helper to pause execution briefly
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 async function seedPlaceholders(count) {
-  for (let i = 0; i < count; i++) {
-    const randomName = sampleNames[i % sampleNames.length];
-    await fetch('/api/names', {
+  const btn = event.target;
+  btn.disabled = true;
+  try {
+    await fetch('/api/names/seed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: randomName, featured: false })
+      body: JSON.stringify({ count })
     });
-    // Tiny delay prevents race condition duplicate IDs on server
-    await sleep(80);
+  } catch (err) {
+    console.error('Seed error:', err);
   }
+  setTimeout(() => { btn.disabled = false; }, 1000);
 }
 
 async function triggerScene(state) {
