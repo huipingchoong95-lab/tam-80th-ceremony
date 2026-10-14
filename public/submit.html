@@ -119,12 +119,10 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// Background Network Animation Loop
 function animate() {
   bgCtx.clearRect(0, 0, W, H);
   bgCtx.lineWidth = 2;
 
-  // Draw network nodes and web lines
   for(let i=0; i<netNodes.length; i++) {
     let n = netNodes[i];
     n.x += n.vx; n.y += n.vy;
@@ -149,7 +147,6 @@ function animate() {
     }
   }
 
-  // Render active Ping / Packet animation effects
   fxCtx.clearRect(0, 0, W, H);
   for (let i = packets.length - 1; i >= 0; i--) {
     let p = packets[i];
@@ -162,7 +159,6 @@ function animate() {
 }
 requestAnimationFrame(animate);
 
-// Network Ping Packet Class
 class PingPacket {
   constructor(startX, startY, targetX, targetY, onComplete) {
     this.x = startX;
@@ -191,7 +187,6 @@ class PingPacket {
     }
   }
   draw() {
-    // Draw traceroute trail line
     if (this.trail.length > 1) {
       fxCtx.save();
       fxCtx.strokeStyle = 'rgba(0, 255, 204, 0.6)';
@@ -205,7 +200,6 @@ class PingPacket {
       fxCtx.restore();
     }
 
-    // Draw Packet Head
     fxCtx.save();
     fxCtx.fillStyle = '#fff';
     fxCtx.shadowColor = '#00ffcc';
@@ -217,7 +211,6 @@ class PingPacket {
   }
 }
 
-// Form Submission Handler with Network Ping Animation
 async function handleTransmit(e) {
   e.preventDefault();
   const nameVal = document.getElementById('name-input').value.trim();
@@ -230,15 +223,12 @@ async function handleTransmit(e) {
   log.style.color = '#38bdf8';
   log.textContent = `[ICMP] PING tam.penang.80th (56 data bytes)...`;
 
-  // Get button coordinates for packet start position
   const rect = btn.getBoundingClientRect();
   const startX = rect.left + rect.width / 2;
   const startY = rect.top;
-  // Target server node (center top of screen)
   const targetX = W / 2;
   const targetY = H / 4;
 
-  // Trigger Ping Packet Animation
   packets.push(new PingPacket(startX, startY, targetX, targetY, async () => {
     log.textContent = `[SYN] Handshake established. Transmitting payload...`;
 
@@ -246,7 +236,7 @@ async function handleTransmit(e) {
       const res = await fetch('/api/names', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nameVal, featured: false })
+        body: JSON.stringify({ name: nameVal })
       });
 
       if (res.ok) {
@@ -254,8 +244,9 @@ async function handleTransmit(e) {
         log.textContent = `[ACK 200 OK] Node successfully registered on Wall!`;
         document.getElementById('submit-form').reset();
       } else {
+        const errData = await res.json().catch(() => ({}));
         log.style.color = '#f43f5e';
-        log.textContent = `[ERROR 500] Transmission rejected by server.`;
+        log.textContent = `[ERROR ${res.status}] ${errData.error || 'Server rejected transmission.'}`;
       }
     } catch (err) {
       log.style.color = '#f43f5e';
@@ -265,7 +256,7 @@ async function handleTransmit(e) {
     setTimeout(() => {
       btn.disabled = false;
       log.textContent = '';
-    }, 2500);
+    }, 3000);
   }));
 }
 </script>
