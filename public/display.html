@@ -69,7 +69,6 @@ const TITLE_LINE1 = '80th Anniversary';
 const TITLE_LINE2 = 'TAM Penang';
 const FIREWORK_WORDS = ['80', 'TAM', '2027'];
 
-const POPIN_MS = 450;
 const ZOOM_IN_MS = 900;
 const ZOOM_HOLD_MS = 2200;
 const ZOOM_OUT_MS = 900;
@@ -173,7 +172,6 @@ function generateShapePoints() {
   }
 }
 
-// Medium-speed incoming tracer packet (speed: 16)
 class IncomingPacket {
   constructor(wordObj) {
     this.wordObj = wordObj;
@@ -389,10 +387,6 @@ function getTargetFontSize(totalCount) {
 
 function checkIsPresident(name, featured) {
   if (featured === true || featured === 'true' || featured === 1) return true;
-  if (typeof name === 'string') {
-    const l = name.toLowerCase();
-    if (l.includes('president') || l.includes('vip') || l.includes('soon') || l.includes('ts.')) return true;
-  }
   return false;
 }
 
@@ -435,27 +429,35 @@ function updateAllFontSizesExcept(excludeId) {
 }
 
 function assignAndDraw(id, name, featured, immediate) {
+  // Prevent duplicate rendering if node already exists
   if (placed.has(id)) return;
-  const isPres = checkIsPresident(name, featured);
-
-  if (isPres) {
-    const wordObj = { id, name, x: W / 2, y: H / 2, rot: 0, color: FEATURED_COLOR, fontPx: Math.max(56, Math.min(W * 0.055, 84)), featured: true };
-    placed.set(id, wordObj); counterEl.textContent = placed.size;
-    if (immediate) stampWord(baseCtx, wordObj, 1);
-    else { incomingPackets.push(new IncomingPacket(wordObj)); ensureLoop(); }
-    return;
-  }
 
   if (slots.length === 0 || slotIndex >= slots.length || placed.size >= slots.length) {
     slots = buildSlots(placed.size + 1);
     slotIndex = 0;
   }
 
+  const isPres = checkIsPresident(name, featured);
   const slot = slots[slotIndex % slots.length];
   slotIndex++;
-  const targetFont = getTargetFontSize(placed.size + 1);
-  const wordObj = { id, name, x: slot.x, y: slot.y, rot: (Math.random() * 10 - 5) * (Math.PI / 180), color: pickColor(name), fontPx: targetFont, featured: false };
-  placed.set(id, wordObj); counterEl.textContent = placed.size;
+
+  // Calculate distinct position for featured entries vs regular entries
+  let targetX = slot.x;
+  let targetY = slot.y;
+  let fontPx = getTargetFontSize(placed.size + 1);
+
+  if (isPres) {
+    // Count existing featured entries to stack them without overlapping
+    let featuredCount = 0;
+    for (const p of placed.values()) { if (p.featured) featuredCount++; }
+    targetX = W / 2;
+    targetY = (H * 0.42) + (featuredCount * 60);
+    fontPx = Math.max(38, Math.min(W * 0.035, 52));
+  }
+
+  const wordObj = { id, name, x: targetX, y: targetY, rot: isPres ? 0 : (Math.random() * 10 - 5) * (Math.PI / 180), color: isPres ? FEATURED_COLOR : pickColor(name), fontPx, featured: isPres };
+  placed.set(id, wordObj); 
+  counterEl.textContent = placed.size;
 
   if (immediate) {
     stampWord(baseCtx, wordObj, 1);
