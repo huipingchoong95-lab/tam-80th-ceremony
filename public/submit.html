@@ -37,20 +37,20 @@
   h1 { color: #00ffcc; font-size: 22px; margin-top: 0; margin-bottom: 8px; letter-spacing: 0.5px; text-shadow: 0 0 10px rgba(0,255,204,0.4); }
   p.subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
 
-  .input-group { margin-bottom: 16px; text-align: left; }
+  .input-group { margin-bottom: 20px; text-align: left; }
   label { display: block; font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
   
-  input, select {
+  input {
     width: 100%; padding: 14px 16px; border-radius: 10px;
     background: #020617; border: 1px solid rgba(0, 255, 204, 0.4);
     color: #fff; font-size: 15px; font-weight: 600; outline: none; transition: 0.2s;
   }
-  input:focus, select:focus { border-color: #00ffcc; box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
+  input:focus { border-color: #00ffcc; box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
 
   button {
     width: 100%; padding: 14px; border-radius: 10px; border: none;
     background: #00ffcc; color: #040914; font-size: 15px; font-weight: 800;
-    cursor: pointer; transition: 0.2s; margin-top: 8px; letter-spacing: 0.5px;
+    cursor: pointer; transition: 0.2s; margin-top: 4px; letter-spacing: 0.5px;
     box-shadow: 0 4px 16px rgba(0, 255, 204, 0.3);
   }
   button:hover { background: #38bdf8; box-shadow: 0 4px 20px rgba(56, 189, 248, 0.5); }
@@ -81,20 +81,8 @@
       
       <form id="submit-form" onsubmit="handleTransmit(event)">
         <div class="input-group">
-          <label>Your Name / Handle</label>
+          <label>Your Name</label>
           <input type="text" id="name-input" placeholder="e.g. Ts. Choong Hui Ping" required autocomplete="off">
-        </div>
-        
-        <div class="input-group">
-          <label>Category / Affiliation</label>
-          <select id="category-input">
-            <option value="Member">TAM Member</option>
-            <option value="Delegate">Delegate / Official</option>
-            <option value="Participant">Event Participant</option>
-            <option value="Supporter">Supporter / Industry Guest</option>
-            <option value="Visitor">Visitor</option>
-            <option value="Student">Student Chapter</option>
-          </select>
         </div>
 
         <button type="submit" id="transmit-btn">Transmit Node to Wall</button>
@@ -233,7 +221,6 @@ class PingPacket {
 async function handleTransmit(e) {
   e.preventDefault();
   const nameVal = document.getElementById('name-input').value.trim();
-  const catVal = document.getElementById('category-input').value;
   const btn = document.getElementById('transmit-btn');
   const log = document.getElementById('console-log');
 
@@ -259,7 +246,7 @@ async function handleTransmit(e) {
       const res = await fetch('/api/names', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: `${nameVal} (${catVal})` })
+        body: JSON.stringify({ name: nameVal })
       });
 
       if (res.ok) {
