@@ -82,7 +82,7 @@
       <form id="submit-form" onsubmit="handleTransmit(event)">
         <div class="input-group">
           <label>Your Name</label>
-          <input type="text" id="name-input" placeholder="e.g. Ts. Choong Hui Ping" required autocomplete="off">
+          <input type="text" id="name-input" placeholder="e.g. Ir. Ahmad bin Abdullah" required autocomplete="off">
         </div>
 
         <button type="submit" id="transmit-btn">Transmit Node to Wall</button>
@@ -246,7 +246,7 @@ async function handleTransmit(e) {
       const res = await fetch('/api/names', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nameVal })
+        body: JSON.stringify({ name: nameVal, featured: false })
       });
 
       if (res.ok) {
