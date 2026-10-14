@@ -3,158 +3,283 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TAM Penang 80th Anniversary — Join the Shape</title>
+<title>TAM Penang 80th Anniversary — Join the Wall</title>
 <style>
-  body { 
-    font-family: sans-serif; 
-    background: #040914; 
-    color: #e0f2fe; 
-    margin: 0; 
-    padding: 24px; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    min-height: 100vh; 
-    box-sizing: border-box; 
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #040914; overflow: hidden; font-family: sans-serif; color: #e0f2fe; }
+  canvas { position: absolute; top: 0; left: 0; }
+  #bg { z-index: 1; }
+  #fx { z-index: 2; pointer-events: none; }
+
+  /* Back to Portal Header Button */
+  .back-nav {
+    position: absolute; top: 20px; left: 20px; z-index: 20;
+    text-decoration: none; color: #00ffcc; font-size: 13px; font-weight: 700;
+    background: rgba(10, 20, 35, 0.7); backdrop-filter: blur(12px);
+    padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(0, 255, 204, 0.3);
+    transition: 0.2s; box-shadow: 0 4px 16px rgba(0, 255, 204, 0.1);
   }
-  .card { 
-    background: rgba(10, 20, 35, 0.9); 
-    border: 1px solid rgba(0, 255, 204, 0.3); 
-    padding: 36px 24px; 
-    border-radius: 20px; 
-    width: 100%; 
-    max-width: 400px; 
-    box-shadow: 0 8px 32px rgba(0, 255, 204, 0.15); 
-    text-align: center; 
-    backdrop-filter: blur(12px);
+  .back-nav:hover { background: rgba(0, 255, 204, 0.2); color: #fff; }
+
+  .container {
+    position: relative; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; padding: 20px;
   }
-  .logo-text { 
-    font-size: 13px; 
-    font-weight: 700; 
-    color: #00ffcc; 
-    letter-spacing: 1.5px; 
-    text-transform: uppercase; 
-    margin-bottom: 8px; 
+
+  .card {
+    background: rgba(10, 20, 35, 0.75); backdrop-filter: blur(16px);
+    border: 1px solid rgba(0, 255, 204, 0.35); padding: 32px 28px; border-radius: 20px;
+    width: 100%; max-width: 440px; box-shadow: 0 8px 32px rgba(0, 255, 204, 0.15);
+    text-align: center;
   }
-  h1 { 
-    color: #ffffff; 
-    font-size: 24px; 
-    margin: 0 0 8px 0; 
+
+  h1 { color: #00ffcc; font-size: 22px; margin-top: 0; margin-bottom: 8px; letter-spacing: 0.5px; text-shadow: 0 0 10px rgba(0,255,204,0.4); }
+  p.subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+
+  .input-group { margin-bottom: 16px; text-align: left; }
+  label { display: block; font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  
+  input, select {
+    width: 100%; padding: 14px 16px; border-radius: 10px;
+    background: #020617; border: 1px solid rgba(0, 255, 204, 0.4);
+    color: #fff; font-size: 15px; font-weight: 600; outline: none; transition: 0.2s;
   }
-  p { 
-    color: #94a3b8; 
-    font-size: 14px; 
-    margin-bottom: 24px; 
-    line-height: 1.5; 
-  }
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  input { 
-    width: 100%; 
-    padding: 16px; 
-    border-radius: 12px; 
-    border: 1px solid rgba(0, 255, 204, 0.4); 
-    background: #020617; 
-    color: #fff; 
-    font-size: 16px; 
-    box-sizing: border-box; 
-    outline: none; 
-    text-align: center; 
-    transition: 0.2s;
-  }
-  input:focus { 
-    border-color: #38bdf8; 
-    box-shadow: 0 0 12px rgba(56, 189, 248, 0.3); 
-  }
-  button { 
-    width: 100%; 
-    padding: 16px; 
-    border-radius: 12px; 
-    border: none; 
-    background: #00ffcc; 
-    color: #040914; 
-    font-size: 16px; 
-    font-weight: 700; 
-    cursor: pointer; 
-    transition: 0.2s; 
+  input:focus, select:focus { border-color: #00ffcc; box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
+
+  button {
+    width: 100%; padding: 14px; border-radius: 10px; border: none;
+    background: #00ffcc; color: #040914; font-size: 15px; font-weight: 800;
+    cursor: pointer; transition: 0.2s; margin-top: 8px; letter-spacing: 0.5px;
     box-shadow: 0 4px 16px rgba(0, 255, 204, 0.3);
   }
-  button:hover { 
-    background: #38bdf8; 
-    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.4);
+  button:hover { background: #38bdf8; box-shadow: 0 4px 20px rgba(56, 189, 248, 0.5); }
+  button:disabled { background: #334155; color: #64748b; cursor: not-allowed; box-shadow: none; }
+
+  #console-log {
+    margin-top: 14px; font-family: monospace; font-size: 11px; color: #34d399; min-height: 18px;
+    text-shadow: 0 0 6px rgba(52, 211, 153, 0.4); word-break: break-all;
   }
-  button:active {
-    transform: scale(0.98);
+
+  .watermark {
+    position: absolute; bottom: 16px; font-size: 12px; color: rgba(0, 255, 204, 0.4);
+    font-weight: 500; letter-spacing: 0.5px; pointer-events: none;
   }
-  #message { 
-    margin-top: 16px; 
-    font-size: 14px; 
-    font-weight: 600; 
-    min-height: 24px; 
-    transition: 0.3s;
-  }
-  .success { color: #00ffcc; }
-  .error { color: #f43f5e; }
 </style>
 </head>
 <body>
 
-  <div class="card">
-    <div class="logo-text">TAM Penang 80th Anniversary</div>
-    <h1>Join the Network</h1>
-    <p>Enter your name or handle to anchor your node into the live display shape.</p>
-    
-    <form id="submit-form" onsubmit="submitName(event)">
-      <input type="text" id="name-input" placeholder="Your Name or Nickname" maxlength="40" autocomplete="off" required>
-      <button type="submit" id="submit-btn">Submit Name</button>
-    </form>
-    
-    <div id="message"></div>
+  <a href="/index.html" class="back-nav">← Back to Portal</a>
+
+  <canvas id="bg"></canvas>
+  <canvas id="fx"></canvas>
+
+  <div class="container">
+    <div class="card">
+      <h1>TAM 80th Anniversary</h1>
+      <p class="subtitle">Connect your node to the live celebration wall</p>
+      
+      <form id="submit-form" onsubmit="handleTransmit(event)">
+        <div class="input-group">
+          <label>Your Name / Handle</label>
+          <input type="text" id="name-input" placeholder="e.g. Ts. Choong Hui Ping" required autocomplete="off">
+        </div>
+        
+        <div class="input-group">
+          <label>Category / Affiliation</label>
+          <select id="category-input">
+            <option value="Member">TAM Member</option>
+            <option value="Delegate">Delegate / Official</option>
+            <option value="Participant">Event Participant</option>
+            <option value="Supporter">Supporter / Industry Guest</option>
+            <option value="Visitor">Visitor</option>
+            <option value="Student">Student Chapter</option>
+          </select>
+        </div>
+
+        <button type="submit" id="transmit-btn">Transmit Node to Wall</button>
+      </form>
+
+      <div id="console-log"></div>
+    </div>
   </div>
 
-<script>
-async function submitName(event) {
-  event.preventDefault();
-  const input = document.getElementById('name-input');
-  const btn = document.getElementById('submit-btn');
-  const msg = document.getElementById('message');
-  const name = input.value.trim();
+  <div class="watermark">Designed & Developed by Ts. Choong Hui Ping</div>
 
-  if (!name) return;
+<script>
+const bgCanvas = document.getElementById('bg');
+const fxCanvas = document.getElementById('fx');
+const bgCtx = bgCanvas.getContext('2d');
+const fxCtx = fxCanvas.getContext('2d');
+
+let W = 0, H = 0, DPR = 1;
+let netNodes = [], packets = [];
+
+for(let i=0; i<60; i++) {
+  netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
+}
+
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  for (const c of [bgCanvas, fxCanvas]) {
+    c.width = W * DPR; c.height = H * DPR;
+    c.style.width = W + 'px'; c.style.height = H + 'px';
+    c.getContext('2d').setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Background Network Animation Loop
+function animate() {
+  bgCtx.clearRect(0, 0, W, H);
+  bgCtx.lineWidth = 2;
+
+  // Draw network nodes and web lines
+  for(let i=0; i<netNodes.length; i++) {
+    let n = netNodes[i];
+    n.x += n.vx; n.y += n.vy;
+    if(n.x < 0 || n.x > 1) n.vx *= -1;
+    if(n.y < 0 || n.y > 1) n.vy *= -1;
+    
+    let px = n.x * W, py = n.y * H;
+    bgCtx.fillStyle = '#00ffcc';
+    bgCtx.shadowColor = 'rgba(0, 255, 204, 0.8)';
+    bgCtx.shadowBlur = 6;
+    bgCtx.beginPath(); bgCtx.arc(px, py, 3, 0, Math.PI*2); bgCtx.fill();
+    bgCtx.shadowBlur = 0;
+    
+    for(let j=i+1; j<netNodes.length; j++) {
+      let n2 = netNodes[j];
+      let p2x = n2.x * W, p2y = n2.y * H;
+      let dist = Math.hypot(px - p2x, py - p2y);
+      if(dist < 180) {
+        bgCtx.strokeStyle = `rgba(0, 255, 204, ${0.35 * (1 - dist/180)})`;
+        bgCtx.beginPath(); bgCtx.moveTo(px, py); bgCtx.lineTo(p2x, p2y); bgCtx.stroke();
+      }
+    }
+  }
+
+  // Render active Ping / Packet animation effects
+  fxCtx.clearRect(0, 0, W, H);
+  for (let i = packets.length - 1; i >= 0; i--) {
+    let p = packets[i];
+    p.update();
+    p.draw();
+    if (!p.alive) packets.splice(i, 1);
+  }
+
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// Network Ping Packet Class
+class PingPacket {
+  constructor(startX, startY, targetX, targetY, onComplete) {
+    this.x = startX;
+    this.y = startY;
+    this.targetX = targetX;
+    this.targetY = targetY;
+    this.speed = 22;
+    this.onComplete = onComplete;
+    this.alive = true;
+    this.trail = [];
+  }
+  update() {
+    let dx = this.targetX - this.x;
+    let dy = this.targetY - this.y;
+    let dist = Math.hypot(dx, dy);
+
+    this.trail.push({ x: this.x, y: this.y });
+    if (this.trail.length > 12) this.trail.shift();
+
+    if (dist < this.speed) {
+      this.alive = false;
+      if (this.onComplete) this.onComplete();
+    } else {
+      this.x += (dx / dist) * this.speed;
+      this.y += (dy / dist) * this.speed;
+    }
+  }
+  draw() {
+    // Draw traceroute trail line
+    if (this.trail.length > 1) {
+      fxCtx.save();
+      fxCtx.strokeStyle = 'rgba(0, 255, 204, 0.6)';
+      fxCtx.lineWidth = 3;
+      fxCtx.shadowColor = '#00ffcc';
+      fxCtx.shadowBlur = 10;
+      fxCtx.beginPath();
+      fxCtx.moveTo(this.trail[0].x, this.trail[0].y);
+      for (let t of this.trail) fxCtx.lineTo(t.x, t.y);
+      fxCtx.stroke();
+      fxCtx.restore();
+    }
+
+    // Draw Packet Head
+    fxCtx.save();
+    fxCtx.fillStyle = '#fff';
+    fxCtx.shadowColor = '#00ffcc';
+    fxCtx.shadowBlur = 15;
+    fxCtx.beginPath();
+    fxCtx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+    fxCtx.fill();
+    fxCtx.restore();
+  }
+}
+
+// Form Submission Handler with Network Ping Animation
+async function handleTransmit(e) {
+  e.preventDefault();
+  const nameVal = document.getElementById('name-input').value.trim();
+  const catVal = document.getElementById('category-input').value;
+  const btn = document.getElementById('transmit-btn');
+  const log = document.getElementById('console-log');
+
+  if (!nameVal) return;
 
   btn.disabled = true;
-  btn.style.opacity = '0.6';
-  msg.textContent = 'Transmitting node...';
-  msg.className = '';
+  log.style.color = '#38bdf8';
+  log.textContent = `[ICMP] PING tam.penang.80th (56 data bytes)...`;
 
-  try {
-    const res = await fetch('/api/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    });
-    
-    const data = await res.json();
-    
-    if (res.ok) {
-      msg.textContent = 'Successfully joined the network!';
-      msg.className = 'success';
-      input.value = '';
-      setTimeout(() => { msg.textContent = ''; }, 4000);
-    } else {
-      msg.textContent = data.error || 'Submission failed. Try again.';
-      msg.className = 'error';
+  // Get button coordinates for packet start position
+  const rect = btn.getBoundingClientRect();
+  const startX = rect.left + rect.width / 2;
+  const startY = rect.top;
+  // Target server node (center top of screen)
+  const targetX = W / 2;
+  const targetY = H / 4;
+
+  // Trigger Ping Packet Animation
+  packets.push(new PingPacket(startX, startY, targetX, targetY, async () => {
+    log.textContent = `[SYN] Handshake established. Transmitting payload...`;
+
+    try {
+      const res = await fetch('/api/names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: `${nameVal} (${catVal})` })
+      });
+
+      if (res.ok) {
+        log.style.color = '#34d399';
+        log.textContent = `[ACK 200 OK] Node successfully registered on Wall!`;
+        document.getElementById('submit-form').reset();
+      } else {
+        log.style.color = '#f43f5e';
+        log.textContent = `[ERROR 500] Transmission rejected by server.`;
+      }
+    } catch (err) {
+      log.style.color = '#f43f5e';
+      log.textContent = `[TIMEOUT] Network unreachable.`;
     }
-  } catch (err) {
-    msg.textContent = 'Network error. Please check your connection.';
-    msg.className = 'error';
-  } finally {
-    btn.disabled = false;
-    btn.style.opacity = '1';
-  }
+
+    setTimeout(() => {
+      btn.disabled = false;
+      log.textContent = '';
+    }, 2500);
+  }));
 }
 </script>
 </body>
