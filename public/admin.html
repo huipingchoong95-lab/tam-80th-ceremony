@@ -28,14 +28,12 @@
     min-height: 100vh; padding: 40px 16px; text-align: center;
   }
 
-  /* Login Card */
   #login-card {
     background: rgba(10, 20, 35, 0.85); backdrop-filter: blur(16px);
     border: 1px solid rgba(0, 255, 204, 0.35); padding: 36px 28px; border-radius: 20px;
     width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0, 255, 204, 0.15);
   }
 
-  /* Control Dashboard */
   #dashboard {
     display: none; width: 100%; max-width: 900px; text-align: left;
   }
@@ -60,6 +58,7 @@
     box-shadow: 0 4px 16px rgba(0, 255, 204, 0.25);
   }
   button:hover { background: #38bdf8; box-shadow: 0 4px 20px rgba(56, 189, 248, 0.4); }
+  button:disabled { background: #334155; color: #64748b; cursor: not-allowed; box-shadow: none; }
   
   .secondary-btn {
     background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);
@@ -109,7 +108,6 @@
   <canvas id="bg"></canvas>
 
   <div class="container">
-    <!-- PIN Login Card -->
     <div id="login-card">
       <h1>Admin Authentication</h1>
       <p class="subtitle">Enter committee PIN to access control panel</p>
@@ -122,23 +120,20 @@
       <div id="error-msg"></div>
     </div>
 
-    <!-- Main Dashboard (Unlocked) -->
     <div id="dashboard">
       <h1>TAM 80th Anniversary — Control Panel</h1>
       <p class="subtitle">Manage live wall states, VIP spotlight, and placeholder generation</p>
 
       <div class="card-grid">
-        <!-- President / VIP Zoom Spotlight -->
         <div class="panel-card" style="border-color: rgba(242, 193, 78, 0.5);">
           <h3 style="color: #f2c14e;">👑 President / VIP Spotlight</h3>
           <div class="input-group">
             <label style="color: #f2c14e;">President / VIP Name</label>
             <input type="text" id="vip-name-input" placeholder="e.g. Ir. Ts. President Name">
           </div>
-          <button class="gold-btn" onclick="triggerVipZoom()">🌟 Trigger Spotlight Zoom on Display</button>
+          <button class="gold-btn" id="vip-btn" onclick="triggerVipZoom()">🌟 Trigger Spotlight Zoom on Display</button>
         </div>
 
-        <!-- Placeholder Names Generator -->
         <div class="panel-card">
           <h3>⚡ Placeholder Generator</h3>
           <p style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">Seed the wall with sample nodes for testing before guests arrive.</p>
@@ -146,14 +141,12 @@
           <button class="secondary-btn" onclick="seedPlaceholders(15)" style="margin-top: 8px;">+ Add 15 Demo Names</button>
         </div>
 
-        <!-- Scene Controls -->
         <div class="panel-card">
           <h3>🎬 Scene Modes</h3>
           <button onclick="triggerScene('collecting')">🟢 Normal Wall Mode</button>
           <button onclick="triggerScene('title')" style="margin-top: 8px;">🎆 Trigger 80th Title & Fireworks</button>
         </div>
 
-        <!-- Reset Zone -->
         <div class="panel-card">
           <h3>⚠️ Reset Control</h3>
           <p style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">Clear all submitted nodes from display wall.</p>
@@ -161,7 +154,6 @@
         </div>
       </div>
 
-      <!-- Live Moderation Table -->
       <div class="panel-card">
         <h3>Live Submissions Moderation</h3>
         <div class="table-container">
@@ -233,7 +225,6 @@ function animate() {
 }
 requestAnimationFrame(animate);
 
-// PIN Authentication
 async function handleLogin(e) {
   e.preventDefault();
   const pin = document.getElementById('pin-input').value.trim();
@@ -260,7 +251,6 @@ async function handleLogin(e) {
   }
 }
 
-// Live Moderation SSE Sync
 let allNames = [];
 const source = new EventSource('/api/events');
 source.addEventListener('sync', (e) => {
@@ -269,8 +259,11 @@ source.addEventListener('sync', (e) => {
   renderTable();
 });
 source.addEventListener('name:new', (e) => {
-  allNames.push(JSON.parse(e.data));
-  renderTable();
+  const newName = JSON.parse(e.data);
+  if (!allNames.some(n => n.id === newName.id)) {
+    allNames.push(newName);
+    renderTable();
+  }
 });
 source.addEventListener('name:deleted', (e) => {
   const id = JSON.parse(e.data).id;
@@ -303,23 +296,26 @@ function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// REST Actions
 async function triggerVipZoom() {
-  const vipName = document.getElementById('vip-name-input').value.trim() || 'President Ir. Ts. TAM';
+  const vipInput = document.getElementById('vip-name-input');
+  const vipBtn = document.getElementById('vip-btn');
+  const vipName = vipInput.value.trim() || 'President Ir. Ts. TAM';
   
-  // Submit name marked as featured/president
+  vipBtn.disabled = true;
+
   await fetch('/api/names', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: vipName, featured: true })
   });
 
-  // Trigger Zoom Spotlight
   await fetch('/api/scene', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ state: 'zoom', payload: { name: vipName } })
   });
+
+  setTimeout(() => { vipBtn.disabled = false; }, 1200);
 }
 
 const sampleNames = [
@@ -328,14 +324,19 @@ const sampleNames = [
   "Engr. David Ooi", "Ts. Bernard Tan", "Ir. Khor Swee Heng", "Ts. Grace Chew"
 ];
 
+// Helper to pause execution briefly
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function seedPlaceholders(count) {
   for (let i = 0; i < count; i++) {
-    const randomName = sampleNames[Math.floor(Math.random() * sampleNames.length)];
+    const randomName = sampleNames[i % sampleNames.length];
     await fetch('/api/names', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: randomName, featured: false })
     });
+    // Tiny delay prevents race condition duplicate IDs on server
+    await sleep(80);
   }
 }
 
