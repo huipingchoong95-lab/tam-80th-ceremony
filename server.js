@@ -3,15 +3,14 @@ const QRCode = require('qrcode');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CRITICAL: Middleware to parse incoming JSON payloads
 app.use(express.json());
 app.use(express.static('public'));
 
 let names = [];
 let clients = [];
-let sceneState = { state: 'collecting' }; // 'collecting', 'zoom', 'title'
+let sceneState = { state: 'collecting' };
 
-// SSE endpoint for live screen sync
+// SSE endpoint for live display sync
 app.get('/api/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -30,7 +29,7 @@ function broadcast(event, data) {
   clients.forEach(c => c.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
 }
 
-// QR Code generation endpoint for display.html
+// QR Code endpoint
 app.get('/api/qr', async (req, res) => {
   try {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
@@ -39,20 +38,25 @@ app.get('/api/qr', async (req, res) => {
     
     const qrDataUrl = await QRCode.toDataURL(submitUrl, {
       margin: 2,
-      color: {
-        dark: '#040914',
-        light: '#ffffff'
-      }
+      color: { dark: '#040914', light: '#ffffff' }
     });
     
     res.json({ qr: qrDataUrl });
   } catch (err) {
-    console.error('Error generating QR code:', err);
     res.status(500).json({ error: 'Failed to generate QR code' });
   }
 });
 
-// POST endpoint for name submissions
+// Admin PIN Authentication Route (PIN: 2026)
+app.post('/api/admin/auth', (req, res) => {
+  const { pin } = req.body || {};
+  if (pin === '2026' || pin === 2026) {
+    return res.json({ success: true });
+  }
+  return res.status(401).json({ success: false, error: 'Invalid PIN' });
+});
+
+// Name submission endpoint
 app.post('/api/names', (req, res) => {
   try {
     const { name, featured } = req.body || {};
@@ -73,7 +77,6 @@ app.post('/api/names', (req, res) => {
 
     return res.status(201).json(newEntry);
   } catch (err) {
-    console.error('Error handling POST /api/names:', err);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
