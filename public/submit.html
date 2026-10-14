@@ -11,7 +11,6 @@
   #bg { z-index: 1; }
   #fx { z-index: 2; pointer-events: none; }
 
-  /* Back to Portal Header Button */
   .back-nav {
     position: absolute; top: 20px; left: 20px; z-index: 20;
     text-decoration: none; color: #00ffcc; font-size: 13px; font-weight: 700;
@@ -61,6 +60,16 @@
     text-shadow: 0 0 6px rgba(52, 211, 153, 0.4); word-break: break-all;
   }
 
+  /* Flying Photon Light Particle element */
+  .photon-particle {
+    position: fixed; z-index: 999;
+    background: #00ffcc; color: #040914; font-weight: 800; font-size: 14px;
+    padding: 8px 16px; border-radius: 20px;
+    box-shadow: 0 0 25px #00ffcc, 0 0 10px #ffffff;
+    pointer-events: none;
+    transition: transform 0.9s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.9s ease-in;
+  }
+
   .watermark {
     position: absolute; bottom: 16px; font-size: 12px; color: rgba(0, 255, 204, 0.4);
     font-weight: 500; letter-spacing: 0.5px; pointer-events: none;
@@ -101,7 +110,7 @@ const bgCtx = bgCanvas.getContext('2d');
 const fxCtx = fxCanvas.getContext('2d');
 
 let W = 0, H = 0, DPR = 1;
-let netNodes = [], packets = [];
+let netNodes = [];
 
 for(let i=0; i<60; i++) {
   netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
@@ -146,74 +155,15 @@ function animate() {
       }
     }
   }
-
-  fxCtx.clearRect(0, 0, W, H);
-  for (let i = packets.length - 1; i >= 0; i--) {
-    let p = packets[i];
-    p.update();
-    p.draw();
-    if (!p.alive) packets.splice(i, 1);
-  }
-
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
 
-class PingPacket {
-  constructor(startX, startY, targetX, targetY, onComplete) {
-    this.x = startX;
-    this.y = startY;
-    this.targetX = targetX;
-    this.targetY = targetY;
-    this.speed = 22;
-    this.onComplete = onComplete;
-    this.alive = true;
-    this.trail = [];
-  }
-  update() {
-    let dx = this.targetX - this.x;
-    let dy = this.targetY - this.y;
-    let dist = Math.hypot(dx, dy);
-
-    this.trail.push({ x: this.x, y: this.y });
-    if (this.trail.length > 12) this.trail.shift();
-
-    if (dist < this.speed) {
-      this.alive = false;
-      if (this.onComplete) this.onComplete();
-    } else {
-      this.x += (dx / dist) * this.speed;
-      this.y += (dy / dist) * this.speed;
-    }
-  }
-  draw() {
-    if (this.trail.length > 1) {
-      fxCtx.save();
-      fxCtx.strokeStyle = 'rgba(0, 255, 204, 0.6)';
-      fxCtx.lineWidth = 3;
-      fxCtx.shadowColor = '#00ffcc';
-      fxCtx.shadowBlur = 10;
-      fxCtx.beginPath();
-      fxCtx.moveTo(this.trail[0].x, this.trail[0].y);
-      for (let t of this.trail) fxCtx.lineTo(t.x, t.y);
-      fxCtx.stroke();
-      fxCtx.restore();
-    }
-
-    fxCtx.save();
-    fxCtx.fillStyle = '#fff';
-    fxCtx.shadowColor = '#00ffcc';
-    fxCtx.shadowBlur = 15;
-    fxCtx.beginPath();
-    fxCtx.arc(this.x, this.y, 5, 0, Math.PI * 2);
-    fxCtx.fill();
-    fxCtx.restore();
-  }
-}
-
+// Photon Shooting Upward Animation + API Transmission
 async function handleTransmit(e) {
   e.preventDefault();
-  const nameVal = document.getElementById('name-input').value.trim();
+  const inputEl = document.getElementById('name-input');
+  const nameVal = inputEl.value.trim();
   const btn = document.getElementById('transmit-btn');
   const log = document.getElementById('console-log');
 
@@ -221,43 +171,52 @@ async function handleTransmit(e) {
 
   btn.disabled = true;
   log.style.color = '#38bdf8';
-  log.textContent = `[ICMP] PING tam.penang.80th (56 data bytes)...`;
+  log.textContent = `[SYN] Initializing quantum packet stream...`;
 
-  const rect = btn.getBoundingClientRect();
-  const startX = rect.left + rect.width / 2;
-  const startY = rect.top;
-  const targetX = W / 2;
-  const targetY = H / 4;
+  // Create Photon Light Particle at input box
+  const inputRect = inputEl.getBoundingClientRect();
+  const photon = document.createElement('div');
+  photon.className = 'photon-particle';
+  photon.textContent = nameVal;
+  photon.style.left = `${inputRect.left + inputRect.width / 2 - 50}px`;
+  photon.style.top = `${inputRect.top}px`;
+  document.body.appendChild(photon);
 
-  packets.push(new PingPacket(startX, startY, targetX, targetY, async () => {
-    log.textContent = `[SYN] Handshake established. Transmitting payload...`;
+  // Trigger upward launch animation
+  requestAnimationFrame(() => {
+    photon.style.transform = `translateY(-130vh) scale(0.3)`;
+    photon.style.opacity = '0';
+  });
 
-    try {
-      const res = await fetch('/api/names', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nameVal })
-      });
+  // Send name to server
+  try {
+    const res = await fetch('/api/names', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nameVal })
+    });
 
-      if (res.ok) {
-        log.style.color = '#34d399';
-        log.textContent = `[ACK 200 OK] Node successfully registered on Wall!`;
-        document.getElementById('submit-form').reset();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        log.style.color = '#f43f5e';
-        log.textContent = `[ERROR ${res.status}] ${errData.error || 'Server rejected transmission.'}`;
-      }
-    } catch (err) {
+    if (res.ok) {
+      log.style.color = '#34d399';
+      log.textContent = `[ACK 200 OK] Packet transmitted to display wall!`;
+      inputEl.value = '';
+    } else {
+      const errData = await res.json().catch(() => ({}));
       log.style.color = '#f43f5e';
-      log.textContent = `[TIMEOUT] Network unreachable.`;
+      log.textContent = `[ERROR ${res.status}] ${errData.error || 'Server rejected transmission.'}`;
     }
+  } catch (err) {
+    log.style.color = '#f43f5e';
+    log.textContent = `[TIMEOUT] Network unreachable.`;
+  }
 
-    setTimeout(() => {
-      btn.disabled = false;
-      log.textContent = '';
-    }, 3000);
-  }));
+  // Cleanup photon DOM element after animation
+  setTimeout(() => photon.remove(), 900);
+
+  setTimeout(() => {
+    btn.disabled = false;
+    log.textContent = '';
+  }, 3000);
 }
 </script>
 </body>
