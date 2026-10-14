@@ -6,48 +6,53 @@
 <title>TAM Penang 80th Anniversary — Main Portal</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; height: 100%; background: #040914; overflow: hidden; font-family: sans-serif; color: #e0f2fe; }
-  canvas { position: absolute; top: 0; left: 0; }
+  html, body { 
+    margin: 0; padding: 0; min-height: 100%; 
+    background: #040914; overflow-y: auto; 
+    font-family: sans-serif; color: #e0f2fe; 
+  }
+  canvas { position: fixed; top: 0; left: 0; pointer-events: none; }
   #bg { z-index: 1; }
 
   .container {
     position: relative; z-index: 10;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    min-height: 100%; padding: 24px; text-align: center;
+    min-height: 100vh; padding: 40px 16px; text-align: center;
   }
 
-  h1 { color: #00ffcc; font-size: 26px; margin-top: 0; margin-bottom: 8px; letter-spacing: 0.5px; text-shadow: 0 0 12px rgba(0,255,204,0.4); }
-  p.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 32px; max-width: 480px; }
+  h1 { color: #00ffcc; font-size: 24px; margin-top: 0; margin-bottom: 6px; letter-spacing: 0.5px; text-shadow: 0 0 12px rgba(0,255,204,0.4); }
+  p.subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 24px; max-width: 480px; }
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
     width: 100%;
-    max-width: 900px;
+    max-width: 850px;
+    margin-bottom: 20px;
   }
 
   .portal-card {
     background: rgba(10, 20, 35, 0.75); backdrop-filter: blur(16px);
-    border: 1px solid rgba(0, 255, 204, 0.35); padding: 28px 24px; border-radius: 20px;
+    border: 1px solid rgba(0, 255, 204, 0.35); padding: 22px 20px; border-radius: 16px;
     box-shadow: 0 8px 32px rgba(0, 255, 204, 0.12);
     text-decoration: none; color: #fff; transition: 0.25s transform, 0.25s border-color, 0.25s box-shadow;
     display: flex; flex-direction: column; align-items: center; text-align: center;
   }
 
   .portal-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-4px);
     border-color: #00ffcc;
     box-shadow: 0 12px 36px rgba(0, 255, 204, 0.3);
   }
 
-  .icon { font-size: 36px; margin-bottom: 14px; }
-  .card-title { font-size: 18px; font-weight: 700; color: #00ffcc; margin-bottom: 8px; }
-  .card-desc { font-size: 13px; color: #94a3b8; line-height: 1.5; }
+  .icon { font-size: 30px; margin-bottom: 10px; }
+  .card-title { font-size: 16px; font-weight: 700; color: #00ffcc; margin-bottom: 6px; }
+  .card-desc { font-size: 12px; color: #94a3b8; line-height: 1.4; }
 
   .watermark {
-    position: absolute; bottom: 16px; font-size: 12px; color: rgba(0, 255, 204, 0.45);
-    font-weight: 500; letter-spacing: 0.5px; pointer-events: none;
+    margin-top: 20px; font-size: 11px; color: rgba(0, 255, 204, 0.45);
+    font-weight: 500; letter-spacing: 0.5px;
   }
 </style>
 </head>
@@ -81,9 +86,9 @@
         <div class="card-desc">PIN-protected control dashboard for scene triggers, VIP spotlights, and moderation.</div>
       </a>
     </div>
-  </div>
 
-  <div class="watermark">Designed & Developed by Ts. Choong Hui Ping</div>
+    <div class="watermark">Designed & Developed by Ts. Choong Hui Ping</div>
+  </div>
 
 <script>
 const bgCanvas = document.getElementById('bg');
