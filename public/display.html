@@ -173,19 +173,19 @@ function generateShapePoints() {
 }
 
 class Sparkle {
-  constructor(cx, cy) {
+  constructor(cx, cy, spread = 220) {
     this.cx = cx;
     this.cy = cy;
     const angle = Math.random() * Math.PI * 2;
-    const radius = Math.random() * 220 + 30;
+    const radius = Math.random() * spread + 10;
     this.x = cx + Math.cos(angle) * radius;
     this.y = cy + Math.sin(angle) * radius;
-    this.vx = (Math.random() - 0.5) * 2;
-    this.vy = (Math.random() - 0.5) * 2 - 0.5;
-    this.size = Math.random() * 3.5 + 1;
+    this.vx = (Math.random() - 0.5) * 1.5;
+    this.vy = (Math.random() - 0.5) * 1.5 - 0.3;
+    this.size = Math.random() * 3 + 1;
     this.alpha = 1;
-    this.decay = Math.random() * 0.03 + 0.015;
-    this.color = Math.random() > 0.4 ? '#f2c14e' : '#ffffff';
+    this.decay = Math.random() * 0.025 + 0.012;
+    this.color = Math.random() > 0.3 ? '#f2c14e' : '#ffffff';
   }
   update() {
     this.x += this.vx;
@@ -391,7 +391,6 @@ function animateBg() {
 }
 requestAnimationFrame(animateBg);
 
-// DUAL-TIER HYBRID SLOT GENERATOR (Supports up to 700+ names cleanly without overlapping)
 function buildSlots(targetCount = 50) {
   const off = document.createElement('canvas'); off.width = W; off.height = H;
   const octx = off.getContext('2d');
@@ -406,8 +405,6 @@ function buildSlots(targetCount = 50) {
   octx.restore();
 
   const img = octx.getImageData(0, 0, W, H).data;
-  
-  // Adaptive step sizes to ensure we generate enough slots for 600-700 participants
   let cellSize = 30;
   if (targetCount > 500) cellSize = 14;
   else if (targetCount > 300) cellSize = 16;
@@ -417,7 +414,6 @@ function buildSlots(targetCount = 50) {
   cellSize = Math.max(10, Math.floor(cellSize));
   const rawPoints = [];
 
-  // Tier 1: Collect points inside the "80" shape
   for (let y = cellSize / 2; y < H; y += cellSize) {
     for (let x = cellSize / 2; x < W; x += cellSize) {
       if (img[(Math.floor(y) * W + Math.floor(x)) * 4 + 3] > 128) {
@@ -426,18 +422,15 @@ function buildSlots(targetCount = 50) {
     }
   }
 
-  // Tier 2: If targetCount exceeds core capacity, generate outer constellation slots across the screen margins
   if (targetCount > rawPoints.length) {
     const marginGridStep = 45;
     for (let y = 60; y < H - 60; y += marginGridStep) {
       for (let x = 60; x < W - 60; x += marginGridStep) {
-        // Exclude top-left HUD area and top-right QR code area
         const inHud = (x < 320 && y < 140);
         const inQr = (x > W - 320 && y < 320);
         const inCenterCore = img[(Math.floor(y) * W + Math.floor(x)) * 4 + 3] > 128;
         
         if (!inHud && !inQr && !inCenterCore) {
-          // Add slight jitter for a natural constellation network look
           rawPoints.push({ 
             x: x + (Math.random() * 20 - 10), 
             y: y + (Math.random() * 20 - 10) 
@@ -447,7 +440,6 @@ function buildSlots(targetCount = 50) {
     }
   }
 
-  // Enforce strict minimum spacing padding to completely prevent text overlaps
   const result = [];
   const minSpacing = targetCount > 400 ? 14 : (targetCount > 200 ? 18 : 26);
 
@@ -462,7 +454,6 @@ function buildSlots(targetCount = 50) {
     if (!tooClose) result.push(pt);
   }
 
-  // Shuffle slot order so incoming names populate dynamically across both core and outer rings
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [result[i], result[j]] = [result[j], result[i]];
@@ -470,7 +461,6 @@ function buildSlots(targetCount = 50) {
   return result;
 }
 
-// ADAPTIVE MICRO-FONT SCALING CURVE (Seamlessly scales down for up to 700+ nodes)
 function getTargetFontSize(totalCount) {
   if (totalCount <= 5) return Math.min(W * 0.035, 45);
   if (totalCount <= 15) return Math.min(W * 0.026, 34);
@@ -480,7 +470,7 @@ function getTargetFontSize(totalCount) {
   if (totalCount <= 200) return Math.min(W * 0.009, 12);
   if (totalCount <= 350) return Math.min(W * 0.0075, 10);
   if (totalCount <= 550) return Math.min(W * 0.006, 8.5);
-  return Math.min(W * 0.0048, 7); // Clean, crisp legibility even at 700+ entries
+  return Math.min(W * 0.0048, 7);
 }
 
 function checkIsPresident(name, featured) {
@@ -576,7 +566,7 @@ function stampWord(ctx, w, scale) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (w.featured) {
     ctx.font = `800 ${w.fontPx}px Arial, sans-serif`;
-    ctx.shadowColor = 'rgba(242, 193, 78, 0.95)'; ctx.shadowBlur = 35; ctx.fillStyle = FEATURED_COLOR;
+    ctx.shadowColor = 'rgba(242, 193, 78, 1)'; ctx.shadowBlur = 35; ctx.fillStyle = FEATURED_COLOR;
   } else {
     ctx.font = `700 ${w.fontPx}px Arial, sans-serif`;
     ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 6; ctx.fillStyle = w.color;
@@ -590,6 +580,15 @@ function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * 
 function loop(now) {
   fxCtx.clearRect(0, 0, W, H);
   let stillActive = false;
+
+  // Continuously add ambient sparkles and natural golden glow to any active President/VIP on the wall
+  for (const w of placed.values()) {
+    if (w.featured) {
+      if (Math.random() < 0.25) {
+        sparklers.push(new Sparkle(w.x, w.y, 80));
+      }
+    }
+  }
 
   for (let i = incomingPackets.length - 1; i >= 0; i--) {
     let p = incomingPackets[i];
@@ -608,19 +607,19 @@ function loop(now) {
     if (elapsed < ZOOM_IN_MS) {
       dimAlpha = Math.min(0.7, (elapsed / ZOOM_IN_MS) * 0.7);
       drawZoomName(zoomAnim, easeOutBack(Math.min(1, elapsed / ZOOM_IN_MS)), 1); 
-      if (Math.random() < 0.6) sparklers.push(new Sparkle(W / 2, H * 0.46));
+      if (Math.random() < 0.6) sparklers.push(new Sparkle(W / 2, H * 0.46, 220));
       stillActive = true;
     } else if (elapsed < ZOOM_IN_MS + ZOOM_HOLD_MS) {
       dimAlpha = 0.7; 
       drawZoomName(zoomAnim, 1, 1); 
-      if (Math.random() < 0.8) sparklers.push(new Sparkle(W / 2, H * 0.46));
+      if (Math.random() < 0.8) sparklers.push(new Sparkle(W / 2, H * 0.46, 220));
       stillActive = true;
     } else if (elapsed < ZOOM_IN_MS + ZOOM_HOLD_MS + ZOOM_OUT_MS) {
       const eased = easeInOutCubic((elapsed - ZOOM_IN_MS - ZOOM_HOLD_MS) / ZOOM_OUT_MS);
       dimAlpha = 0.7 * (1 - eased); 
       drawZoomName(zoomAnim, 1, 1 - eased); 
       stillActive = true;
-    } else { dimAlpha = 0; zoomAnim = null; sparklers = []; }
+    } else { dimAlpha = 0; zoomAnim = null; }
   }
 
   for (let i = sparklers.length - 1; i >= 0; i--) {
@@ -657,8 +656,8 @@ function loop(now) {
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
 
-  if (stillActive || fireworks.length > 0 || particles.length > 0 || incomingPackets.length > 0 || sparklers.length > 0) requestAnimationFrame(loop);
-  else loopRunning = false;
+  // Always keep loop running so president ambient sparkles remain active
+  requestAnimationFrame(loop);
 }
 
 function ensureLoop() { if (!loopRunning) { loopRunning = true; requestAnimationFrame(loop); } }
@@ -736,7 +735,6 @@ source.addEventListener('scene:change', (e) => {
     fireworks = [];
     particles = [];
     incomingPackets = [];
-    sparklers = [];
   } else if (scene.state === 'zoom') { 
     zoomAnim = { name: scene.payload.name, targetSlot: { x: W / 2, y: H / 2 }, targetFontPx: 85, start: performance.now() }; 
     ensureLoop(); 
@@ -747,6 +745,7 @@ source.addEventListener('scene:change', (e) => {
 });
 
 resize();
+ensureLoop(); // Keep loop active for ambient president aura
 </script>
 </body>
 </html>
