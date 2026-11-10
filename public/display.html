@@ -139,7 +139,7 @@ let dimAlpha = 0, zoomAnim = null, titleAnim = null;
 let fireworks = [], particles = [], sparklers = [], netNodes = [];
 let shapePointsMap = {}, sequenceIndex = 0, fireworkTimer = 0;
 
-for(let i=0; i<65; i++) {
+for(let i=0; i<85; i++) {
   netNodes.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001 });
 }
 
@@ -264,7 +264,7 @@ class IncomingPacket {
       fxCtx.textAlign = 'center';
       fxCtx.textBaseline = 'middle';
       const isVip = this.wordObj.featured;
-      fxCtx.font = `${isVip ? '800' : '700'} ${Math.max(11, this.wordObj.fontPx * 1.1)}px Arial, sans-serif`;
+      fxCtx.font = `${isVip ? '800' : '700'} ${Math.max(10, this.wordObj.fontPx * 1.1)}px Arial, sans-serif`;
       fxCtx.fillStyle = isVip ? '#f2c14e' : '#ffffff';
       fxCtx.shadowColor = isVip ? '#f2c14e' : '#00ffcc';
       fxCtx.shadowBlur = 12;
@@ -391,13 +391,13 @@ function animateBg() {
 }
 requestAnimationFrame(animateBg);
 
-function buildSlots(totalCount = 50) {
+// DUAL-TIER HYBRID SLOT GENERATOR (Supports up to 700+ names cleanly without overlapping)
+function buildSlots(targetCount = 50) {
   const off = document.createElement('canvas'); off.width = W; off.height = H;
   const octx = off.getContext('2d');
   const fontPx = Math.min(H * 0.88, W * 0.72);
   
   octx.save();
-  // Shift center point down and left: X shifted left by 3.5% of W, Y shifted down by 4% of H
   octx.translate((W / 2) - (W * 0.035), (H / 2) + (H * 0.04));
   octx.scale(1.35, 1.0); 
   octx.font = `bold ${fontPx}px Arial, sans-serif`;
@@ -406,26 +406,50 @@ function buildSlots(totalCount = 50) {
   octx.restore();
 
   const img = octx.getImageData(0, 0, W, H).data;
-  let cellSize = 42;
-  if (totalCount > 250) cellSize = 14;
-  else if (totalCount > 180) cellSize = 16;
-  else if (totalCount > 120) cellSize = 20;
-  else if (totalCount > 70) cellSize = 26;
-  else if (totalCount > 30) cellSize = 34;
   
-  cellSize = Math.max(12, Math.floor(cellSize));
+  // Adaptive step sizes to ensure we generate enough slots for 600-700 participants
+  let cellSize = 30;
+  if (targetCount > 500) cellSize = 14;
+  else if (targetCount > 300) cellSize = 16;
+  else if (targetCount > 150) cellSize = 20;
+  else if (targetCount > 70) cellSize = 26;
+  
+  cellSize = Math.max(10, Math.floor(cellSize));
   const rawPoints = [];
 
+  // Tier 1: Collect points inside the "80" shape
   for (let y = cellSize / 2; y < H; y += cellSize) {
     for (let x = cellSize / 2; x < W; x += cellSize) {
       if (img[(Math.floor(y) * W + Math.floor(x)) * 4 + 3] > 128) {
-        rawPoints.push({ x, y, cellSize });
+        rawPoints.push({ x, y });
       }
     }
   }
 
+  // Tier 2: If targetCount exceeds core capacity, generate outer constellation slots across the screen margins
+  if (targetCount > rawPoints.length) {
+    const marginGridStep = 45;
+    for (let y = 60; y < H - 60; y += marginGridStep) {
+      for (let x = 60; x < W - 60; x += marginGridStep) {
+        // Exclude top-left HUD area and top-right QR code area
+        const inHud = (x < 320 && y < 140);
+        const inQr = (x > W - 320 && y < 320);
+        const inCenterCore = img[(Math.floor(y) * W + Math.floor(x)) * 4 + 3] > 128;
+        
+        if (!inHud && !inQr && !inCenterCore) {
+          // Add slight jitter for a natural constellation network look
+          rawPoints.push({ 
+            x: x + (Math.random() * 20 - 10), 
+            y: y + (Math.random() * 20 - 10) 
+          });
+        }
+      }
+    }
+  }
+
+  // Enforce strict minimum spacing padding to completely prevent text overlaps
   const result = [];
-  const minSpacing = totalCount > 100 ? 22 : 32;
+  const minSpacing = targetCount > 400 ? 14 : (targetCount > 200 ? 18 : 26);
 
   for (let pt of rawPoints) {
     let tooClose = false;
@@ -438,6 +462,7 @@ function buildSlots(totalCount = 50) {
     if (!tooClose) result.push(pt);
   }
 
+  // Shuffle slot order so incoming names populate dynamically across both core and outer rings
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [result[i], result[j]] = [result[j], result[i]];
@@ -445,15 +470,17 @@ function buildSlots(totalCount = 50) {
   return result;
 }
 
+// ADAPTIVE MICRO-FONT SCALING CURVE (Seamlessly scales down for up to 700+ nodes)
 function getTargetFontSize(totalCount) {
   if (totalCount <= 5) return Math.min(W * 0.035, 45);
   if (totalCount <= 15) return Math.min(W * 0.026, 34);
   if (totalCount <= 35) return Math.min(W * 0.020, 26);
   if (totalCount <= 70) return Math.min(W * 0.015, 20);
   if (totalCount <= 120) return Math.min(W * 0.011, 15);
-  if (totalCount <= 170) return Math.min(W * 0.0085, 11);
-  if (totalCount <= 250) return Math.min(W * 0.0065, 8.5);
-  return Math.min(W * 0.005, 7);
+  if (totalCount <= 200) return Math.min(W * 0.009, 12);
+  if (totalCount <= 350) return Math.min(W * 0.0075, 10);
+  if (totalCount <= 550) return Math.min(W * 0.006, 8.5);
+  return Math.min(W * 0.0048, 7); // Clean, crisp legibility even at 700+ entries
 }
 
 function checkIsPresident(name, featured) {
@@ -478,7 +505,6 @@ function rebuildSlotsAndRedraw() {
 function drawIdleOutline() {
   baseCtx.save();
   const fontPx = Math.min(H * 0.88, W * 0.72);
-  // Shifted outline matching the slots translation
   baseCtx.translate((W / 2) - (W * 0.035), (H / 2) + (H * 0.04));
   baseCtx.scale(1.35, 1.0); 
   baseCtx.font = `bold ${fontPx}px Arial, sans-serif`;
