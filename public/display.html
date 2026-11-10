@@ -172,16 +172,17 @@ function generateShapePoints() {
   }
 }
 
+// Shooting Star Incoming Packet carrying the name along its streak
 class IncomingPacket {
   constructor(wordObj) {
     this.wordObj = wordObj;
-    this.startX = Math.random() * W;
-    this.startY = -20;
+    this.startX = wordObj.x + (Math.random() * 260 - 130);
+    this.startY = -60;
     this.x = this.startX;
     this.y = this.startY;
     this.targetX = wordObj.x;
     this.targetY = wordObj.y;
-    this.speed = 16;
+    this.speed = 20;
     this.trail = [];
     this.fading = false;
     this.trailAlpha = 1;
@@ -194,7 +195,7 @@ class IncomingPacket {
       let dist = Math.hypot(dx, dy);
 
       this.trail.push({ x: this.x, y: this.y });
-      if (this.trail.length > 18) this.trail.shift();
+      if (this.trail.length > 24) this.trail.shift();
 
       if (dist < this.speed) {
         this.fading = true;
@@ -205,21 +206,38 @@ class IncomingPacket {
         this.y += (dy / dist) * this.speed;
       }
     } else {
-      this.trailAlpha -= 0.06;
+      this.trailAlpha -= 0.08;
       if (this.trailAlpha <= 0) this.alive = false;
     }
   }
   draw() {
+    // Draw shooting star trail line
     if (this.trail.length > 1 && this.trailAlpha > 0) {
       fxCtx.save();
-      fxCtx.strokeStyle = `rgba(0, 255, 204, ${Math.max(0, 0.75 * this.trailAlpha)})`;
-      fxCtx.lineWidth = 3.5;
-      fxCtx.shadowColor = '#00ffcc';
-      fxCtx.shadowBlur = 12 * this.trailAlpha;
+      const isVip = this.wordObj.featured;
+      fxCtx.strokeStyle = isVip ? `rgba(242, 193, 78, ${Math.max(0, 0.9 * this.trailAlpha)})` : `rgba(0, 255, 204, ${Math.max(0, 0.8 * this.trailAlpha)})`;
+      fxCtx.lineWidth = isVip ? 5 : 3;
+      fxCtx.shadowColor = isVip ? '#f2c14e' : '#00ffcc';
+      fxCtx.shadowBlur = 16;
       fxCtx.beginPath();
       fxCtx.moveTo(this.trail[0].x, this.trail[0].y);
       for (let t of this.trail) fxCtx.lineTo(t.x, t.y);
       fxCtx.stroke();
+      fxCtx.restore();
+    }
+
+    // Draw the name riding at the head of the shooting star
+    if (!this.fading) {
+      fxCtx.save();
+      fxCtx.translate(this.x, this.y);
+      fxCtx.textAlign = 'center';
+      fxCtx.textBaseline = 'middle';
+      const isVip = this.wordObj.featured;
+      fxCtx.font = `${isVip ? '800' : '700'} ${Math.max(13, this.wordObj.fontPx * 1.15)}px Arial, sans-serif`;
+      fxCtx.fillStyle = isVip ? '#f2c14e' : '#ffffff';
+      fxCtx.shadowColor = isVip ? '#f2c14e' : '#00ffcc';
+      fxCtx.shadowBlur = 14;
+      fxCtx.fillText(this.wordObj.name, 0, 0);
       fxCtx.restore();
     }
   }
@@ -345,19 +363,23 @@ requestAnimationFrame(animateBg);
 function buildSlots(totalCount = 50) {
   const off = document.createElement('canvas'); off.width = W; off.height = H;
   const octx = off.getContext('2d');
-  const fontPx = Math.min(H * 0.75, W * 0.45);
+  // Made the '80' shape background larger across the canvas area
+  const fontPx = Math.min(H * 0.82, W * 0.52);
   octx.font = `bold ${fontPx}px Arial, sans-serif`;
   octx.textAlign = 'center'; octx.textBaseline = 'middle'; octx.fillStyle = '#fff';
   octx.fillText(SHAPE_TEXT, W / 2, H / 2);
 
   const img = octx.getImageData(0, 0, W, H).data;
-  let cellSize = 36;
-  if (totalCount > 150) cellSize = 14;
-  else if (totalCount > 100) cellSize = 18;
-  else if (totalCount > 60) cellSize = 24;
-  else if (totalCount > 30) cellSize = 30;
   
-  cellSize = Math.max(12, Math.floor(cellSize));
+  // Finer cell spacing when count is high to support 150+ names cleanly without overlapping
+  let cellSize = 34;
+  if (totalCount > 200) cellSize = 11;
+  else if (totalCount > 150) cellSize = 13;
+  else if (totalCount > 100) cellSize = 16;
+  else if (totalCount > 60) cellSize = 22;
+  else if (totalCount > 30) cellSize = 28;
+  
+  cellSize = Math.max(10, Math.floor(cellSize));
   const result = [];
 
   for (let y = cellSize / 2; y < H; y += cellSize) {
@@ -375,14 +397,15 @@ function buildSlots(totalCount = 50) {
   return result;
 }
 
+// Adjusted font scaling curves to maintain pristine clarity past 150+ names
 function getTargetFontSize(totalCount) {
-  if (totalCount <= 5) return Math.min(W * 0.028, 38);
-  if (totalCount <= 15) return Math.min(W * 0.022, 28);
-  if (totalCount <= 30) return Math.min(W * 0.016, 21);
-  if (totalCount <= 60) return Math.min(W * 0.012, 16);
-  if (totalCount <= 100) return Math.min(W * 0.0095, 12);
-  if (totalCount <= 150) return Math.min(W * 0.0075, 10);
-  return Math.min(W * 0.006, 8);
+  if (totalCount <= 5) return Math.min(W * 0.032, 42);
+  if (totalCount <= 15) return Math.min(W * 0.024, 32);
+  if (totalCount <= 30) return Math.min(W * 0.018, 24);
+  if (totalCount <= 60) return Math.min(W * 0.013, 18);
+  if (totalCount <= 100) return Math.min(W * 0.010, 14);
+  if (totalCount <= 150) return Math.min(W * 0.008, 11);
+  return Math.min(W * 0.0065, 9);
 }
 
 function checkIsPresident(name, featured) {
@@ -398,7 +421,7 @@ function rebuildSlotsAndRedraw() {
   baseCtx.clearRect(0, 0, W, H);
   drawIdleOutline();
   for (const w of entries) {
-    placed.set(w.id, w); // RESTORE INTO PLACED MAP
+    placed.set(w.id, w);
     stampWord(baseCtx, w, 1);
   }
   counterEl.textContent = placed.size;
@@ -406,7 +429,8 @@ function rebuildSlotsAndRedraw() {
 
 function drawIdleOutline() {
   baseCtx.save();
-  baseCtx.font = `bold ${Math.min(H * 0.75, W * 0.45)}px Arial, sans-serif`;
+  // Larger background outline matching the expanded shape size
+  baseCtx.font = `bold ${Math.min(H * 0.82, W * 0.52)}px Arial, sans-serif`;
   baseCtx.textAlign = 'center'; baseCtx.textBaseline = 'middle';
   baseCtx.strokeStyle = 'rgba(0, 255, 204, 0.12)';
   baseCtx.lineWidth = 3;
@@ -453,8 +477,9 @@ function assignAndDraw(id, name, featured, immediate) {
     let featuredCount = 0;
     for (const p of placed.values()) { if (p.featured) featuredCount++; }
     targetX = W / 2;
-    targetY = (H * 0.42) + (featuredCount * 60);
-    fontPx = Math.max(38, Math.min(W * 0.035, 52));
+    targetY = (H * 0.42) + (featuredCount * 65);
+    // Made President / VIP font size significantly larger and more prominent
+    fontPx = Math.max(46, Math.min(W * 0.045, 62));
   }
 
   const wordObj = { id, name, x: targetX, y: targetY, rot: isPres ? 0 : (Math.random() * 10 - 5) * (Math.PI / 180), color: isPres ? FEATURED_COLOR : pickColor(name), fontPx, featured: isPres };
@@ -475,10 +500,10 @@ function stampWord(ctx, w, scale) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (w.featured) {
     ctx.font = `800 ${w.fontPx}px Arial, sans-serif`;
-    ctx.shadowColor = 'rgba(242, 193, 78, 0.9)'; ctx.shadowBlur = 30; ctx.fillStyle = FEATURED_COLOR;
+    ctx.shadowColor = 'rgba(242, 193, 78, 0.95)'; ctx.shadowBlur = 35; ctx.fillStyle = FEATURED_COLOR;
   } else {
     ctx.font = `700 ${w.fontPx}px Arial, sans-serif`;
-    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 6; ctx.fillStyle = w.color;
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 6; ctx.fillStyle = w.color;
   }
   ctx.fillText(w.name, 0, 0); ctx.restore();
 }
@@ -549,7 +574,7 @@ function loop(now) {
 function ensureLoop() { if (!loopRunning) { loopRunning = true; requestAnimationFrame(loop); } }
 
 function drawZoomName(anim, growT, shrinkT) {
-  const bigFontPx = Math.min(H * 0.16, W * 0.09);
+  const bigFontPx = Math.min(H * 0.18, W * 0.10);
   const start = { x: W / 2, y: H / 2, fontPx: bigFontPx * 0.15 }, big = { x: W / 2, y: H * 0.46, fontPx: bigFontPx };
   const end = { x: anim.targetSlot.x, y: anim.targetSlot.y, fontPx: anim.targetFontPx };
   let x = shrinkT === 1 ? start.x + (big.x - start.x) * growT : big.x + (end.x - big.x) * (1 - shrinkT);
@@ -557,9 +582,9 @@ function drawZoomName(anim, growT, shrinkT) {
   let fontPx = shrinkT === 1 ? start.fontPx + (big.fontPx - start.fontPx) * growT : big.fontPx + (end.fontPx - big.fontPx) * (1 - shrinkT);
 
   fxCtx.save(); fxCtx.translate(x, y);
-  fxCtx.font = `700 ${fontPx}px Arial, sans-serif`;
+  fxCtx.font = `800 ${fontPx}px Arial, sans-serif`;
   fxCtx.textAlign = 'center'; fxCtx.textBaseline = 'middle';
-  fxCtx.shadowColor = 'rgba(242, 193, 78, 1)'; fxCtx.shadowBlur = 40;
+  fxCtx.shadowColor = 'rgba(242, 193, 78, 1)'; fxCtx.shadowBlur = 45;
   fxCtx.fillStyle = FEATURED_COLOR; fxCtx.fillText(anim.name, 0, 0); fxCtx.restore();
 }
 
@@ -600,7 +625,7 @@ source.addEventListener('name:new', (e) => assignAndDraw(JSON.parse(e.data).id, 
 source.addEventListener('names:batch', (e) => {
   const batch = JSON.parse(e.data);
   for (const n of batch) {
-    if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, false);
+    if (!n.hidden) assignAndDrop(n.id, n.name, n.featured, false); // batch handles regular adding
   }
 });
 source.addEventListener('name:deleted', (e) => { 
@@ -622,7 +647,7 @@ source.addEventListener('scene:change', (e) => {
     particles = [];
     incomingPackets = [];
   } else if (scene.state === 'zoom') { 
-    zoomAnim = { name: scene.payload.name, targetSlot: { x: W / 2, y: H / 2 }, targetFontPx: 80, start: performance.now() }; 
+    zoomAnim = { name: scene.payload.name, targetSlot: { x: W / 2, y: H / 2 }, targetFontPx: 85, start: performance.now() }; 
     ensureLoop(); 
   } else if (scene.state === 'title') { 
     titleAnim = { start: performance.now() }; 
