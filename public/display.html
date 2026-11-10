@@ -172,7 +172,6 @@ function generateShapePoints() {
   }
 }
 
-// Shooting Star Incoming Packet carrying the name along its streak
 class IncomingPacket {
   constructor(wordObj) {
     this.wordObj = wordObj;
@@ -211,7 +210,6 @@ class IncomingPacket {
     }
   }
   draw() {
-    // Draw shooting star trail line
     if (this.trail.length > 1 && this.trailAlpha > 0) {
       fxCtx.save();
       const isVip = this.wordObj.featured;
@@ -226,7 +224,6 @@ class IncomingPacket {
       fxCtx.restore();
     }
 
-    // Draw the name riding at the head of the shooting star
     if (!this.fading) {
       fxCtx.save();
       fxCtx.translate(this.x, this.y);
@@ -363,15 +360,12 @@ requestAnimationFrame(animateBg);
 function buildSlots(totalCount = 50) {
   const off = document.createElement('canvas'); off.width = W; off.height = H;
   const octx = off.getContext('2d');
-  // Made the '80' shape background larger across the canvas area
   const fontPx = Math.min(H * 0.82, W * 0.52);
   octx.font = `bold ${fontPx}px Arial, sans-serif`;
   octx.textAlign = 'center'; octx.textBaseline = 'middle'; octx.fillStyle = '#fff';
   octx.fillText(SHAPE_TEXT, W / 2, H / 2);
 
   const img = octx.getImageData(0, 0, W, H).data;
-  
-  // Finer cell spacing when count is high to support 150+ names cleanly without overlapping
   let cellSize = 34;
   if (totalCount > 200) cellSize = 11;
   else if (totalCount > 150) cellSize = 13;
@@ -397,7 +391,6 @@ function buildSlots(totalCount = 50) {
   return result;
 }
 
-// Adjusted font scaling curves to maintain pristine clarity past 150+ names
 function getTargetFontSize(totalCount) {
   if (totalCount <= 5) return Math.min(W * 0.032, 42);
   if (totalCount <= 15) return Math.min(W * 0.024, 32);
@@ -429,7 +422,6 @@ function rebuildSlotsAndRedraw() {
 
 function drawIdleOutline() {
   baseCtx.save();
-  // Larger background outline matching the expanded shape size
   baseCtx.font = `bold ${Math.min(H * 0.82, W * 0.52)}px Arial, sans-serif`;
   baseCtx.textAlign = 'center'; baseCtx.textBaseline = 'middle';
   baseCtx.strokeStyle = 'rgba(0, 255, 204, 0.12)';
@@ -478,7 +470,6 @@ function assignAndDraw(id, name, featured, immediate) {
     for (const p of placed.values()) { if (p.featured) featuredCount++; }
     targetX = W / 2;
     targetY = (H * 0.42) + (featuredCount * 65);
-    // Made President / VIP font size significantly larger and more prominent
     fontPx = Math.max(46, Math.min(W * 0.045, 62));
   }
 
@@ -625,7 +616,7 @@ source.addEventListener('name:new', (e) => assignAndDraw(JSON.parse(e.data).id, 
 source.addEventListener('names:batch', (e) => {
   const batch = JSON.parse(e.data);
   for (const n of batch) {
-    if (!n.hidden) assignAndDrop(n.id, n.name, n.featured, false); // batch handles regular adding
+    if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, false); // <--- Fixed to assignAndDraw
   }
 });
 source.addEventListener('name:deleted', (e) => { 
