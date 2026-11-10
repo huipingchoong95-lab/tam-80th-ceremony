@@ -85,6 +85,39 @@ const audioCtx = new AudioContext();
   }, { once: true, passive: true });
 });
 
+// Load custom Grand_Gala_Fanfare.mp3 via Web Audio API buffer
+let titleAudioBuffer = null;
+let titleAudioSource = null;
+
+fetch('./Grand_Gala_Fanfare.mp3')
+  .then(res => res.arrayBuffer())
+  .then(data => audioCtx.decodeAudioData(data))
+  .then(buffer => { titleAudioBuffer = buffer; })
+  .catch(() => console.log('Custom title audio file Grand_Gala_Fanfare.mp3 not found.'));
+
+function startTitleBGM() {
+  if (audioCtx.state === 'suspended' || !titleAudioBuffer) return;
+  stopTitleBGM();
+
+  titleAudioSource = audioCtx.createBufferSource();
+  titleAudioSource.buffer = titleAudioBuffer;
+  titleAudioSource.loop = true; // Seamless loop
+  
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.setValueAtTime(0.6, audioCtx.currentTime);
+  
+  titleAudioSource.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  titleAudioSource.start(0);
+}
+
+function stopTitleBGM() {
+  if (titleAudioSource) {
+    try { titleAudioSource.stop(); titleAudioSource.disconnect(); } catch(e){}
+    titleAudioSource = null;
+  }
+}
+
 function playBoom() {
   if (audioCtx.state === 'suspended') return;
   const bufferSize = audioCtx.sampleRate * 1.2;
@@ -118,60 +151,6 @@ function playLaserBlip() {
   gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
   osc.connect(gain); gain.connect(audioCtx.destination);
   osc.start(); osc.stop(audioCtx.currentTime + 0.25);
-}
-
-// Looping Triumphant BGM for the 80th Title Sequence
-let titleBgmInterval = null;
-
-function startTitleBGM() {
-  if (audioCtx.state === 'suspended') return;
-  stopTitleBGM(); // Clear any existing loop
-
-  const playChordProgression = () => {
-    if (!titleAnim) return; // Stop loop if title scene ended
-    const chords = [
-      [261.63, 329.63, 392.00], // C major
-      [329.63, 392.00, 523.25], // E minor / C
-      [392.00, 493.88, 587.33], // G major
-      [523.25, 659.25, 783.99]  // High C major resolve
-    ];
-
-    chords.forEach((chord, index) => {
-      const startTime = audioCtx.currentTime + (index * 0.45);
-      chord.forEach(freq => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        const filter = audioCtx.createBiquadFilter();
-
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, startTime);
-
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(1400, startTime);
-
-        gain.gain.setValueAtTime(0.01, startTime);
-        gain.gain.linearRampToValueAtTime(0.08, startTime + 0.12);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.1);
-
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        osc.start(startTime);
-        osc.stop(startTime + 1.1);
-      });
-    });
-  };
-
-  playChordProgression(); // Play first loop immediately
-  titleBgmInterval = setInterval(playChordProgression, 2200); // Repeat every 2.2 seconds
-}
-
-function stopTitleBGM() {
-  if (titleBgmInterval) {
-    clearInterval(titleBgmInterval);
-    titleBgmInterval = null;
-  }
 }
 
 const tamLogo = new Image();
@@ -299,7 +278,7 @@ class IncomingPacket {
     this.y = this.startY;
     this.targetX = wordObj.x;
     this.targetY = wordObj.y;
-    this.speed = 4.5;
+    this.speed = 4.5; // Slower cinematic shooting star speed
     this.trail = [];
     this.fading = false;
     this.trailAlpha = 1;
