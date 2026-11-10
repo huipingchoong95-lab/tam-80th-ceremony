@@ -62,7 +62,6 @@
   <div id="watermark">Designed & Developed by Ts. Choong Hui Ping</div>
 
 <script>
-// High-contrast firework palette (warm golds, magenta, orange, white)
 const PALETTE = ['#ffffff', '#f2c14e', '#fbbf24', '#ff77ff', '#ffaa33', '#ff3366', '#ffdd55'];
 const FEATURED_COLOR = '#f2c14e';
 const SHAPE_TEXT = '80';
@@ -173,7 +172,6 @@ function generateShapePoints() {
   }
 }
 
-// Sparkle particle for President / VIP Spotlight
 class Sparkle {
   constructor(cx, cy) {
     this.cx = cx;
@@ -399,8 +397,9 @@ function buildSlots(totalCount = 50) {
   const fontPx = Math.min(H * 0.88, W * 0.72);
   
   octx.save();
-  octx.translate(W / 2, H / 2);
-  octx.scale(1.35, 1.0); // Stretches the '80' shape horizontally across widescreen displays
+  // Shift center point down and left: X shifted left by 3.5% of W, Y shifted down by 4% of H
+  octx.translate((W / 2) - (W * 0.035), (H / 2) + (H * 0.04));
+  octx.scale(1.35, 1.0); 
   octx.font = `bold ${fontPx}px Arial, sans-serif`;
   octx.textAlign = 'center'; octx.textBaseline = 'middle'; octx.fillStyle = '#fff';
   octx.fillText(SHAPE_TEXT, 0, 0);
@@ -479,8 +478,9 @@ function rebuildSlotsAndRedraw() {
 function drawIdleOutline() {
   baseCtx.save();
   const fontPx = Math.min(H * 0.88, W * 0.72);
-  baseCtx.translate(W / 2, H / 2);
-  baseCtx.scale(1.35, 1.0); // Matches the horizontal stretch factor of the slots
+  // Shifted outline matching the slots translation
+  baseCtx.translate((W / 2) - (W * 0.035), (H / 2) + (H * 0.04));
+  baseCtx.scale(1.35, 1.0); 
   baseCtx.font = `bold ${fontPx}px Arial, sans-serif`;
   baseCtx.textAlign = 'center'; baseCtx.textBaseline = 'middle';
   baseCtx.strokeStyle = 'rgba(0, 255, 204, 0.12)';
