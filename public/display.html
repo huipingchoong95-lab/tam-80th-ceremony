@@ -120,6 +120,44 @@ function playLaserBlip() {
   osc.start(); osc.stop(audioCtx.currentTime + 0.25);
 }
 
+// Triumphant BGM Fanfare for the 80th Title Sequence
+function playTitleFanfare() {
+  if (audioCtx.state === 'suspended') return;
+  
+  const chords = [
+    [261.63, 329.63, 392.00], // C major
+    [329.63, 392.00, 523.25], // E minor / C
+    [392.00, 493.88, 587.33], // G major
+    [523.25, 659.25, 783.99]  // High C major resolve
+  ];
+
+  chords.forEach((chord, index) => {
+    const startTime = audioCtx.currentTime + (index * 0.45);
+    chord.forEach(freq => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+
+      osc.type = 'triangle'; // Warm brassy synth tone
+      osc.frequency.setValueAtTime(freq, startTime);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1400, startTime);
+
+      gain.gain.setValueAtTime(0.01, startTime);
+      gain.gain.linearRampToValueAtTime(0.1, startTime + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.1);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + 1.1);
+    });
+  });
+}
+
 const tamLogo = new Image();
 tamLogo.onload = () => { if (titleAnim) ensureLoop(); };
 tamLogo.src = './tam-logo.png';
@@ -656,7 +694,6 @@ function loop(now) {
       stillActive = true;
     } else { 
       dimAlpha = 0; 
-      // Ensure President is stamped onto base canvas when zoom animation finishes
       for (const w of placed.values()) {
         if (w.featured) stampWord(baseCtx, w, 1);
       }
@@ -797,6 +834,7 @@ source.addEventListener('scene:change', (e) => {
     ensureLoop(); 
   } else if (scene.state === 'title') { 
     titleAnim = { start: performance.now() }; 
+    playTitleFanfare(); // Triggers the majestic synthesized BGM chord progression
     ensureLoop(); 
   }
 });
