@@ -62,7 +62,8 @@
   <div id="watermark">Designed & Developed by Ts. Choong Hui Ping</div>
 
 <script>
-const PALETTE = ['#ffffff', '#bae6fd', '#7dd3fc', '#00ffcc', '#f2c14e'];
+// High-contrast firework palette (warm golds, magenta, orange, white — no cyan/light blue that washes out over the white logo)
+const PALETTE = ['#ffffff', '#f2c14e', '#fbbf24', '#ff77ff', '#ffaa33', '#ff3366', '#ffdd55'];
 const FEATURED_COLOR = '#f2c14e';
 const SHAPE_TEXT = '80';
 const TITLE_LINE1 = '80th Anniversary';
@@ -136,7 +137,7 @@ let W = 0, H = 0, DPR = 1;
 let slots = [], placed = new Map(), slotIndex = 0;
 let incomingPackets = [], loopRunning = false;
 let dimAlpha = 0, zoomAnim = null, titleAnim = null;
-let fireworks = [], particles = [], netNodes = [];
+let fireworks = [], particles = [], sparklers = [], netNodes = [];
 let shapePointsMap = {}, sequenceIndex = 0, fireworkTimer = 0;
 
 for(let i=0; i<65; i++) {
@@ -172,7 +173,41 @@ function generateShapePoints() {
   }
 }
 
-// Slower, graceful shooting star descent (speed = 8)
+// Sparkle particle for President / VIP Spotlight
+class Sparkle {
+  constructor(cx, cy) {
+    this.cx = cx;
+    this.cy = cy;
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.random() * 220 + 30;
+    this.x = cx + Math.cos(angle) * radius;
+    this.y = cy + Math.sin(angle) * radius;
+    this.vx = (Math.random() - 0.5) * 2;
+    this.vy = (Math.random() - 0.5) * 2 - 0.5;
+    this.size = Math.random() * 3.5 + 1;
+    this.alpha = 1;
+    this.decay = Math.random() * 0.03 + 0.015;
+    this.color = Math.random() > 0.4 ? '#f2c14e' : '#ffffff';
+  }
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.alpha -= this.decay;
+  }
+  draw() {
+    if (this.alpha <= 0) return;
+    fxCtx.save();
+    fxCtx.globalAlpha = Math.max(0, this.alpha);
+    fxCtx.fillStyle = this.color;
+    fxCtx.shadowColor = this.color;
+    fxCtx.shadowBlur = 10;
+    fxCtx.beginPath();
+    fxCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    fxCtx.fill();
+    fxCtx.restore();
+  }
+}
+
 class IncomingPacket {
   constructor(wordObj) {
     this.wordObj = wordObj;
@@ -182,7 +217,7 @@ class IncomingPacket {
     this.y = this.startY;
     this.targetX = wordObj.x;
     this.targetY = wordObj.y;
-    this.speed = 8; // Slower speed
+    this.speed = 8;
     this.trail = [];
     this.fading = false;
     this.trailAlpha = 1;
@@ -361,16 +396,12 @@ requestAnimationFrame(animateBg);
 function buildSlots(totalCount = 50) {
   const off = document.createElement('canvas'); off.width = W; off.height = H;
   const octx = off.getContext('2d');
-  
-  // MASSIVELY EXPANDED SHAPE AREA (occupies 92% of screen height / 68% of screen width)
   const fontPx = Math.min(H * 0.92, W * 0.68);
   octx.font = `bold ${fontPx}px Arial, sans-serif`;
   octx.textAlign = 'center'; octx.textBaseline = 'middle'; octx.fillStyle = '#fff';
   octx.fillText(SHAPE_TEXT, W / 2, H / 2);
 
   const img = octx.getImageData(0, 0, W, H).data;
-  
-  // Adjusted cell spacing to spread out 150+ names across the massive expanded area
   let cellSize = 42;
   if (totalCount > 250) cellSize = 14;
   else if (totalCount > 180) cellSize = 16;
@@ -389,7 +420,6 @@ function buildSlots(totalCount = 50) {
     }
   }
 
-  // Enforce minimum distance separation between slots to prevent overlapping text boxes
   const result = [];
   const minSpacing = totalCount > 100 ? 22 : 32;
 
@@ -411,7 +441,6 @@ function buildSlots(totalCount = 50) {
   return result;
 }
 
-// AGGRESSIVE DOWNSCALING CURVE for 150+ names so text shrinks cleanly to fit without overlapping
 function getTargetFontSize(totalCount) {
   if (totalCount <= 5) return Math.min(W * 0.035, 45);
   if (totalCount <= 15) return Math.min(W * 0.026, 34);
@@ -544,14 +573,30 @@ function loop(now) {
     const elapsed = now - zoomAnim.start;
     if (elapsed < ZOOM_IN_MS) {
       dimAlpha = Math.min(0.7, (elapsed / ZOOM_IN_MS) * 0.7);
-      drawZoomName(zoomAnim, easeOutBack(Math.min(1, elapsed / ZOOM_IN_MS)), 1); stillActive = true;
+      drawZoomName(zoomAnim, easeOutBack(Math.min(1, elapsed / ZOOM_IN_MS)), 1); 
+      // Add continuous sparkles during zoom hold
+      if (Math.random() < 0.6) sparklers.push(new Sparkle(W / 2, H * 0.46));
+      stillActive = true;
     } else if (elapsed < ZOOM_IN_MS + ZOOM_HOLD_MS) {
-      dimAlpha = 0.7; drawZoomName(zoomAnim, 1, 1); stillActive = true;
+      dimAlpha = 0.7; 
+      drawZoomName(zoomAnim, 1, 1); 
+      if (Math.random() < 0.8) sparklers.push(new Sparkle(W / 2, H * 0.46));
+      stillActive = true;
     } else if (elapsed < ZOOM_IN_MS + ZOOM_HOLD_MS + ZOOM_OUT_MS) {
       const eased = easeInOutCubic((elapsed - ZOOM_IN_MS - ZOOM_HOLD_MS) / ZOOM_OUT_MS);
-      dimAlpha = 0.7 * (1 - eased); drawZoomName(zoomAnim, 1, 1 - eased); stillActive = true;
-    } else { dimAlpha = 0; zoomAnim = null; }
+      dimAlpha = 0.7 * (1 - eased); 
+      drawZoomName(zoomAnim, 1, 1 - eased); 
+      stillActive = true;
+    } else { dimAlpha = 0; zoomAnim = null; sparklers = []; }
   }
+
+  // Update and draw sparkles
+  for (let i = sparklers.length - 1; i >= 0; i--) {
+    sparklers[i].update();
+    sparklers[i].draw();
+    if (sparklers[i].alpha <= 0) sparklers.splice(i, 1);
+  }
+  if (sparklers.length > 0) stillActive = true;
 
   if (titleAnim) {
     const elapsed = now - titleAnim.start;
@@ -580,7 +625,7 @@ function loop(now) {
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
 
-  if (stillActive || fireworks.length > 0 || particles.length > 0 || incomingPackets.length > 0) requestAnimationFrame(loop);
+  if (stillActive || fireworks.length > 0 || particles.length > 0 || incomingPackets.length > 0 || sparklers.length > 0) requestAnimationFrame(loop);
   else loopRunning = false;
 }
 
@@ -659,6 +704,7 @@ source.addEventListener('scene:change', (e) => {
     fireworks = [];
     particles = [];
     incomingPackets = [];
+    sparklers = [];
   } else if (scene.state === 'zoom') { 
     zoomAnim = { name: scene.payload.name, targetSlot: { x: W / 2, y: H / 2 }, targetFontPx: 85, start: performance.now() }; 
     ensureLoop(); 
