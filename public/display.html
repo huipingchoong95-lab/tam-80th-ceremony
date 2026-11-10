@@ -120,42 +120,58 @@ function playLaserBlip() {
   osc.start(); osc.stop(audioCtx.currentTime + 0.25);
 }
 
-// Triumphant BGM Fanfare for the 80th Title Sequence
-function playTitleFanfare() {
+// Looping Triumphant BGM for the 80th Title Sequence
+let titleBgmInterval = null;
+
+function startTitleBGM() {
   if (audioCtx.state === 'suspended') return;
-  
-  const chords = [
-    [261.63, 329.63, 392.00], // C major
-    [329.63, 392.00, 523.25], // E minor / C
-    [392.00, 493.88, 587.33], // G major
-    [523.25, 659.25, 783.99]  // High C major resolve
-  ];
+  stopTitleBGM(); // Clear any existing loop
 
-  chords.forEach((chord, index) => {
-    const startTime = audioCtx.currentTime + (index * 0.45);
-    chord.forEach(freq => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      const filter = audioCtx.createBiquadFilter();
+  const playChordProgression = () => {
+    if (!titleAnim) return; // Stop loop if title scene ended
+    const chords = [
+      [261.63, 329.63, 392.00], // C major
+      [329.63, 392.00, 523.25], // E minor / C
+      [392.00, 493.88, 587.33], // G major
+      [523.25, 659.25, 783.99]  // High C major resolve
+    ];
 
-      osc.type = 'triangle'; // Warm brassy synth tone
-      osc.frequency.setValueAtTime(freq, startTime);
+    chords.forEach((chord, index) => {
+      const startTime = audioCtx.currentTime + (index * 0.45);
+      chord.forEach(freq => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const filter = audioCtx.createBiquadFilter();
 
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(1400, startTime);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, startTime);
 
-      gain.gain.setValueAtTime(0.01, startTime);
-      gain.gain.linearRampToValueAtTime(0.1, startTime + 0.12);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.1);
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1400, startTime);
 
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0.01, startTime);
+        gain.gain.linearRampToValueAtTime(0.08, startTime + 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.1);
 
-      osc.start(startTime);
-      osc.stop(startTime + 1.1);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(startTime);
+        osc.stop(startTime + 1.1);
+      });
     });
-  });
+  };
+
+  playChordProgression(); // Play first loop immediately
+  titleBgmInterval = setInterval(playChordProgression, 2200); // Repeat every 2.2 seconds
+}
+
+function stopTitleBGM() {
+  if (titleBgmInterval) {
+    clearInterval(titleBgmInterval);
+    titleBgmInterval = null;
+  }
 }
 
 const tamLogo = new Image();
@@ -283,7 +299,7 @@ class IncomingPacket {
     this.y = this.startY;
     this.targetX = wordObj.x;
     this.targetY = wordObj.y;
-    this.speed = 8;
+    this.speed = 4.5;
     this.trail = [];
     this.fading = false;
     this.trailAlpha = 1;
@@ -296,7 +312,7 @@ class IncomingPacket {
       let dist = Math.hypot(dx, dy);
 
       this.trail.push({ x: this.x, y: this.y });
-      if (this.trail.length > 30) this.trail.shift();
+      if (this.trail.length > 40) this.trail.shift();
 
       if (dist < this.speed) {
         this.fading = true;
@@ -307,7 +323,7 @@ class IncomingPacket {
         this.y += (dy / dist) * this.speed;
       }
     } else {
-      this.trailAlpha -= 0.05;
+      this.trailAlpha -= 0.04;
       if (this.trailAlpha <= 0) this.alive = false;
     }
   }
@@ -799,8 +815,15 @@ source.addEventListener('sync', (e) => {
   slots = buildSlots(data.names.length);
   baseCtx.clearRect(0, 0, W, H); drawIdleOutline();
   for (const n of data.names) if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, true);
-  if (data.sceneState.state === 'title') titleAnim = { start: performance.now() }; 
-  else if (data.sceneState.state === 'collecting') { titleAnim = null; zoomAnim = null; dimAlpha = 0; }
+  if (data.sceneState.state === 'title') {
+    titleAnim = { start: performance.now() };
+    startTitleBGM();
+  } else if (data.sceneState.state === 'collecting') { 
+    titleAnim = null; 
+    stopTitleBGM();
+    zoomAnim = null; 
+    dimAlpha = 0; 
+  }
   ensureLoop();
 });
 source.addEventListener('name:new', (e) => assignAndDraw(JSON.parse(e.data).id, JSON.parse(e.data).name, JSON.parse(e.data).featured, false));
@@ -816,12 +839,24 @@ source.addEventListener('name:deleted', (e) => {
   counterEl.textContent = placed.size;
   rebuildSlotsAndRedraw(); 
 });
-source.addEventListener('name:reset', () => { placed.clear(); slotIndex = 0; titleAnim = null; zoomAnim = null; dimAlpha = 0; counterEl.textContent = '0'; slots = buildSlots(1); baseCtx.clearRect(0, 0, W, H); drawIdleOutline(); });
+source.addEventListener('name:reset', () => { 
+  placed.clear(); 
+  slotIndex = 0; 
+  titleAnim = null; 
+  stopTitleBGM();
+  zoomAnim = null; 
+  dimAlpha = 0; 
+  counterEl.textContent = '0'; 
+  slots = buildSlots(1); 
+  baseCtx.clearRect(0, 0, W, H); 
+  drawIdleOutline(); 
+});
 
 source.addEventListener('scene:change', (e) => {
   const scene = JSON.parse(e.data);
   if (scene.state === 'collecting') {
     titleAnim = null;
+    stopTitleBGM();
     zoomAnim = null;
     dimAlpha = 0;
     fxCtx.clearRect(0, 0, W, H);
@@ -834,7 +869,7 @@ source.addEventListener('scene:change', (e) => {
     ensureLoop(); 
   } else if (scene.state === 'title') { 
     titleAnim = { start: performance.now() }; 
-    playTitleFanfare(); // Triggers the majestic synthesized BGM chord progression
+    startTitleBGM();
     ensureLoop(); 
   }
 });
