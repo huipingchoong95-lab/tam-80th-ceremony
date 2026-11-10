@@ -172,16 +172,17 @@ function generateShapePoints() {
   }
 }
 
+// Slower, graceful shooting star descent (speed = 8)
 class IncomingPacket {
   constructor(wordObj) {
     this.wordObj = wordObj;
-    this.startX = wordObj.x + (Math.random() * 260 - 130);
-    this.startY = -60;
+    this.startX = wordObj.x + (Math.random() * 200 - 100);
+    this.startY = -80;
     this.x = this.startX;
     this.y = this.startY;
     this.targetX = wordObj.x;
     this.targetY = wordObj.y;
-    this.speed = 20;
+    this.speed = 8; // Slower speed
     this.trail = [];
     this.fading = false;
     this.trailAlpha = 1;
@@ -194,7 +195,7 @@ class IncomingPacket {
       let dist = Math.hypot(dx, dy);
 
       this.trail.push({ x: this.x, y: this.y });
-      if (this.trail.length > 24) this.trail.shift();
+      if (this.trail.length > 30) this.trail.shift();
 
       if (dist < this.speed) {
         this.fading = true;
@@ -205,7 +206,7 @@ class IncomingPacket {
         this.y += (dy / dist) * this.speed;
       }
     } else {
-      this.trailAlpha -= 0.08;
+      this.trailAlpha -= 0.05;
       if (this.trailAlpha <= 0) this.alive = false;
     }
   }
@@ -214,9 +215,9 @@ class IncomingPacket {
       fxCtx.save();
       const isVip = this.wordObj.featured;
       fxCtx.strokeStyle = isVip ? `rgba(242, 193, 78, ${Math.max(0, 0.9 * this.trailAlpha)})` : `rgba(0, 255, 204, ${Math.max(0, 0.8 * this.trailAlpha)})`;
-      fxCtx.lineWidth = isVip ? 5 : 3;
+      fxCtx.lineWidth = isVip ? 4 : 2.5;
       fxCtx.shadowColor = isVip ? '#f2c14e' : '#00ffcc';
-      fxCtx.shadowBlur = 16;
+      fxCtx.shadowBlur = 14;
       fxCtx.beginPath();
       fxCtx.moveTo(this.trail[0].x, this.trail[0].y);
       for (let t of this.trail) fxCtx.lineTo(t.x, t.y);
@@ -230,10 +231,10 @@ class IncomingPacket {
       fxCtx.textAlign = 'center';
       fxCtx.textBaseline = 'middle';
       const isVip = this.wordObj.featured;
-      fxCtx.font = `${isVip ? '800' : '700'} ${Math.max(13, this.wordObj.fontPx * 1.15)}px Arial, sans-serif`;
+      fxCtx.font = `${isVip ? '800' : '700'} ${Math.max(11, this.wordObj.fontPx * 1.1)}px Arial, sans-serif`;
       fxCtx.fillStyle = isVip ? '#f2c14e' : '#ffffff';
       fxCtx.shadowColor = isVip ? '#f2c14e' : '#00ffcc';
-      fxCtx.shadowBlur = 14;
+      fxCtx.shadowBlur = 12;
       fxCtx.fillText(this.wordObj.name, 0, 0);
       fxCtx.restore();
     }
@@ -360,28 +361,47 @@ requestAnimationFrame(animateBg);
 function buildSlots(totalCount = 50) {
   const off = document.createElement('canvas'); off.width = W; off.height = H;
   const octx = off.getContext('2d');
-  const fontPx = Math.min(H * 0.82, W * 0.52);
+  
+  // MASSIVELY EXPANDED SHAPE AREA (occupies 92% of screen height / 68% of screen width)
+  const fontPx = Math.min(H * 0.92, W * 0.68);
   octx.font = `bold ${fontPx}px Arial, sans-serif`;
   octx.textAlign = 'center'; octx.textBaseline = 'middle'; octx.fillStyle = '#fff';
   octx.fillText(SHAPE_TEXT, W / 2, H / 2);
 
   const img = octx.getImageData(0, 0, W, H).data;
-  let cellSize = 34;
-  if (totalCount > 200) cellSize = 11;
-  else if (totalCount > 150) cellSize = 13;
-  else if (totalCount > 100) cellSize = 16;
-  else if (totalCount > 60) cellSize = 22;
-  else if (totalCount > 30) cellSize = 28;
   
-  cellSize = Math.max(10, Math.floor(cellSize));
-  const result = [];
+  // Adjusted cell spacing to spread out 150+ names across the massive expanded area
+  let cellSize = 42;
+  if (totalCount > 250) cellSize = 14;
+  else if (totalCount > 180) cellSize = 16;
+  else if (totalCount > 120) cellSize = 20;
+  else if (totalCount > 70) cellSize = 26;
+  else if (totalCount > 30) cellSize = 34;
+  
+  cellSize = Math.max(12, Math.floor(cellSize));
+  const rawPoints = [];
 
   for (let y = cellSize / 2; y < H; y += cellSize) {
     for (let x = cellSize / 2; x < W; x += cellSize) {
       if (img[(Math.floor(y) * W + Math.floor(x)) * 4 + 3] > 128) {
-        result.push({ x, y, cellSize });
+        rawPoints.push({ x, y, cellSize });
       }
     }
+  }
+
+  // Enforce minimum distance separation between slots to prevent overlapping text boxes
+  const result = [];
+  const minSpacing = totalCount > 100 ? 22 : 32;
+
+  for (let pt of rawPoints) {
+    let tooClose = false;
+    for (let existing of result) {
+      if (Math.hypot(pt.x - existing.x, pt.y - existing.y) < minSpacing) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (!tooClose) result.push(pt);
   }
 
   for (let i = result.length - 1; i > 0; i--) {
@@ -391,14 +411,16 @@ function buildSlots(totalCount = 50) {
   return result;
 }
 
+// AGGRESSIVE DOWNSCALING CURVE for 150+ names so text shrinks cleanly to fit without overlapping
 function getTargetFontSize(totalCount) {
-  if (totalCount <= 5) return Math.min(W * 0.032, 42);
-  if (totalCount <= 15) return Math.min(W * 0.024, 32);
-  if (totalCount <= 30) return Math.min(W * 0.018, 24);
-  if (totalCount <= 60) return Math.min(W * 0.013, 18);
-  if (totalCount <= 100) return Math.min(W * 0.010, 14);
-  if (totalCount <= 150) return Math.min(W * 0.008, 11);
-  return Math.min(W * 0.0065, 9);
+  if (totalCount <= 5) return Math.min(W * 0.035, 45);
+  if (totalCount <= 15) return Math.min(W * 0.026, 34);
+  if (totalCount <= 35) return Math.min(W * 0.020, 26);
+  if (totalCount <= 70) return Math.min(W * 0.015, 20);
+  if (totalCount <= 120) return Math.min(W * 0.011, 15);
+  if (totalCount <= 170) return Math.min(W * 0.0085, 11);
+  if (totalCount <= 250) return Math.min(W * 0.0065, 8.5);
+  return Math.min(W * 0.005, 7);
 }
 
 function checkIsPresident(name, featured) {
@@ -422,7 +444,7 @@ function rebuildSlotsAndRedraw() {
 
 function drawIdleOutline() {
   baseCtx.save();
-  baseCtx.font = `bold ${Math.min(H * 0.82, W * 0.52)}px Arial, sans-serif`;
+  baseCtx.font = `bold ${Math.min(H * 0.92, W * 0.68)}px Arial, sans-serif`;
   baseCtx.textAlign = 'center'; baseCtx.textBaseline = 'middle';
   baseCtx.strokeStyle = 'rgba(0, 255, 204, 0.12)';
   baseCtx.lineWidth = 3;
@@ -469,11 +491,11 @@ function assignAndDraw(id, name, featured, immediate) {
     let featuredCount = 0;
     for (const p of placed.values()) { if (p.featured) featuredCount++; }
     targetX = W / 2;
-    targetY = (H * 0.42) + (featuredCount * 65);
-    fontPx = Math.max(46, Math.min(W * 0.045, 62));
+    targetY = (H * 0.40) + (featuredCount * 70);
+    fontPx = Math.max(48, Math.min(W * 0.05, 66));
   }
 
-  const wordObj = { id, name, x: targetX, y: targetY, rot: isPres ? 0 : (Math.random() * 10 - 5) * (Math.PI / 180), color: isPres ? FEATURED_COLOR : pickColor(name), fontPx, featured: isPres };
+  const wordObj = { id, name, x: targetX, y: targetY, rot: isPres ? 0 : (Math.random() * 8 - 4) * (Math.PI / 180), color: isPres ? FEATURED_COLOR : pickColor(name), fontPx, featured: isPres };
   placed.set(id, wordObj); 
   counterEl.textContent = placed.size;
 
@@ -616,7 +638,7 @@ source.addEventListener('name:new', (e) => assignAndDraw(JSON.parse(e.data).id, 
 source.addEventListener('names:batch', (e) => {
   const batch = JSON.parse(e.data);
   for (const n of batch) {
-    if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, false); // <--- Fixed to assignAndDraw
+    if (!n.hidden) assignAndDraw(n.id, n.name, n.featured, false);
   }
 });
 source.addEventListener('name:deleted', (e) => { 
