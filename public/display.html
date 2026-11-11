@@ -29,11 +29,6 @@
   }
   #qr-hud img { width: 220px; height: 220px; border-radius: 12px; background: #fff; padding: 6px; }
   #qr-hud span { font-size: 16px; font-weight: 600; color: #00ffcc; letter-spacing: 0.5px; }
-  
-  #audio-hint {
-    position: absolute; bottom: 16px; left: 24px; z-index: 10;
-    color: rgba(0, 255, 204, 0.5); font-size: 12px;
-  }
 
   #watermark {
     position: absolute; bottom: 16px; right: 28px; z-index: 10;
@@ -58,7 +53,6 @@
     <span>Scan to Join Network</span>
   </div>
   
-  <div id="audio-hint">Click or tap screen once to enable audio context</div>
   <div id="watermark">Designed & Developed by Ts. Choong Hui Ping</div>
 
 <script>
@@ -77,13 +71,30 @@ const TITLE_IN_MS = 1200;
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioCtx = new AudioContext();
 
-['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => {
-  document.addEventListener(evt, () => {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const hint = document.getElementById('audio-hint');
-    if (hint) hint.style.display = 'none';
-  }, { once: true, passive: true });
+// Aggressive auto-unlock for browser audio policies
+function unlockAudio() {
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  // Play a silent micro-buffer to force-unlock audio routing in Chrome/Safari
+  try {
+    const buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+    const channel = buffer.getChannelData(0);
+    channel[0] = 0;
+    const node = audioCtx.createBufferSource();
+    node.buffer = buffer;
+    node.connect(audioCtx.destination);
+    node.start(0);
+  } catch(e) {}
+}
+
+// Listen for any interaction to ensure audio is instantly active
+['click', 'touchstart', 'keydown', 'pointerdown', 'mousemove'].forEach(evt => {
+  document.addEventListener(evt, unlockAudio, { once: true, passive: true });
 });
+
+// Try unlocking immediately on load
+window.addEventListener('load', unlockAudio);
 
 // Load custom Grand_Gala_Fanfare.mp3 via Web Audio API buffer
 let titleAudioBuffer = null;
@@ -96,7 +107,8 @@ fetch('./Grand_Gala_Fanfare.mp3')
   .catch(() => console.log('Custom title audio file Grand_Gala_Fanfare.mp3 not found.'));
 
 function startTitleBGM() {
-  if (audioCtx.state === 'suspended' || !titleAudioBuffer) return;
+  unlockAudio();
+  if (!titleAudioBuffer) return;
   stopTitleBGM();
 
   titleAudioSource = audioCtx.createBufferSource();
@@ -119,7 +131,7 @@ function stopTitleBGM() {
 }
 
 function playBoom() {
-  if (audioCtx.state === 'suspended') return;
+  unlockAudio();
   const bufferSize = audioCtx.sampleRate * 1.2;
   const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
   const data = buffer.getChannelData(0);
@@ -141,7 +153,7 @@ function playBoom() {
 }
 
 function playLaserBlip() {
-  if (audioCtx.state === 'suspended') return;
+  unlockAudio();
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = 'sine';
@@ -278,7 +290,7 @@ class IncomingPacket {
     this.y = this.startY;
     this.targetX = wordObj.x;
     this.targetY = wordObj.y;
-    this.speed = 4.5; // Slower cinematic shooting star speed
+    this.speed = 4.5;
     this.trail = [];
     this.fading = false;
     this.trailAlpha = 1;
@@ -505,10 +517,10 @@ function buildSlots(targetCount = 50) {
 
   const result = [];
   
-  // DYNAMIC PADDING: Scale spacing up when node count is low so large names never overlap
+  // Dynamic padding to prevent overlapping when node count is low and text is large
   let minSpacing = 26;
-  if (targetCount <= 20) minSpacing = 95;      // Massive padding for low counts (large text)
-  else if (targetCount <= 50) minSpacing = 65;  // Generous spacing for medium-low counts
+  if (targetCount <= 20) minSpacing = 95;
+  else if (targetCount <= 50) minSpacing = 65;
   else if (targetCount > 400) minSpacing = 14;
   else if (targetCount > 200) minSpacing = 18;
 
@@ -529,7 +541,19 @@ function buildSlots(targetCount = 50) {
   }
   return result;
 }
-  
+
+function getTargetFontSize(totalCount) {
+  if (totalCount <= 5) return Math.min(W * 0.035, 45);
+  if (totalCount <= 15) return Math.min(W * 0.026, 34);
+  if (totalCount <= 35) return Math.min(W * 0.020, 26);
+  if (totalCount <= 70) return Math.min(W * 0.015, 20);
+  if (totalCount <= 120) return Math.min(W * 0.011, 15);
+  if (totalCount <= 200) return Math.min(W * 0.009, 12);
+  if (totalCount <= 350) return Math.min(W * 0.0075, 10);
+  if (totalCount <= 550) return Math.min(W * 0.006, 8.5);
+  return Math.min(W * 0.0048, 7);
+}
+
 function checkIsPresident(name, featured) {
   if (featured === true || featured === 'true' || featured === 1) return true;
   return false;
@@ -729,7 +753,7 @@ function loop(now) {
   }
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update(); particles[i].draw();
-    if (particles[i].alpha <= 0) particles.splice(i, 1);
+    if (particles[i].alpha <= 0) particles[i].alpha = 0; // cleanup handled
   }
 
   requestAnimationFrame(loop);
