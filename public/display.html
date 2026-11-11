@@ -76,7 +76,6 @@ function unlockAudio() {
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
-  // Play a silent micro-buffer to force-unlock audio routing in Chrome/Safari
   try {
     const buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
     const channel = buffer.getChannelData(0);
@@ -88,12 +87,9 @@ function unlockAudio() {
   } catch(e) {}
 }
 
-// Listen for any interaction to ensure audio is instantly active
 ['click', 'touchstart', 'keydown', 'pointerdown', 'mousemove'].forEach(evt => {
   document.addEventListener(evt, unlockAudio, { once: true, passive: true });
 });
-
-// Try unlocking immediately on load
 window.addEventListener('load', unlockAudio);
 
 // Load custom Grand_Gala_Fanfare.mp3 via Web Audio API buffer
@@ -113,7 +109,7 @@ function startTitleBGM() {
 
   titleAudioSource = audioCtx.createBufferSource();
   titleAudioSource.buffer = titleAudioBuffer;
-  titleAudioSource.loop = true; // Seamless loop
+  titleAudioSource.loop = true;
   
   const gainNode = audioCtx.createGain();
   gainNode.gain.setValueAtTime(0.6, audioCtx.currentTime);
@@ -622,11 +618,9 @@ function assignAndDraw(id, name, featured, immediate) {
   let fontPx = getTargetFontSize(placed.size + 1);
 
   if (isPres) {
-    let featuredCount = 0;
-    for (const p of placed.values()) { if (p.featured) featuredCount++; }
     targetX = W / 2;
-    targetY = (H * 0.40) + (featuredCount * 70);
-    fontPx = Math.max(48, Math.min(W * 0.05, 66));
+    targetY = H / 2; // Dead-center optical alignment
+    fontPx = Math.max(64, Math.min(W * 0.08, 96)); // Large, commanding scale
   }
 
   const wordObj = { id, name, x: targetX, y: targetY, rot: isPres ? 0 : (Math.random() * 8 - 4) * (Math.PI / 180), color: isPres ? FEATURED_COLOR : pickColor(name), fontPx, featured: isPres };
@@ -753,7 +747,7 @@ function loop(now) {
   }
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update(); particles[i].draw();
-    if (particles[i].alpha <= 0) particles[i].alpha = 0; // cleanup handled
+    if (particles[i].alpha <= 0) particles[i].alpha = 0;
   }
 
   requestAnimationFrame(loop);
