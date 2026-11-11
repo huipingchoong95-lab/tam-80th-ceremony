@@ -504,7 +504,13 @@ function buildSlots(targetCount = 50) {
   }
 
   const result = [];
-  const minSpacing = targetCount > 400 ? 14 : (targetCount > 200 ? 18 : 26);
+  
+  // DYNAMIC PADDING: Scale spacing up when node count is low so large names never overlap
+  let minSpacing = 26;
+  if (targetCount <= 20) minSpacing = 95;      // Massive padding for low counts (large text)
+  else if (targetCount <= 50) minSpacing = 65;  // Generous spacing for medium-low counts
+  else if (targetCount > 400) minSpacing = 14;
+  else if (targetCount > 200) minSpacing = 18;
 
   for (let pt of rawPoints) {
     let tooClose = false;
@@ -523,19 +529,7 @@ function buildSlots(targetCount = 50) {
   }
   return result;
 }
-
-function getTargetFontSize(totalCount) {
-  if (totalCount <= 5) return Math.min(W * 0.035, 45);
-  if (totalCount <= 15) return Math.min(W * 0.026, 34);
-  if (totalCount <= 35) return Math.min(W * 0.020, 26);
-  if (totalCount <= 70) return Math.min(W * 0.015, 20);
-  if (totalCount <= 120) return Math.min(W * 0.011, 15);
-  if (totalCount <= 200) return Math.min(W * 0.009, 12);
-  if (totalCount <= 350) return Math.min(W * 0.0075, 10);
-  if (totalCount <= 550) return Math.min(W * 0.006, 8.5);
-  return Math.min(W * 0.0048, 7);
-}
-
+  
 function checkIsPresident(name, featured) {
   if (featured === true || featured === 'true' || featured === 1) return true;
   return false;
